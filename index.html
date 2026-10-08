@@ -1,0 +1,1465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Finance dashboard POC: online sales by brand and factory, production, marketing and cash safes.">
+<title>Business Finance Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Readex+Pro:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: fixed left rail (modules, Online sales has 4 sub-sections) + top bar (period, quick add) + content.
+   Online sales = landing of 4 mini-dashboards → each opens a full section dashboard (widgets → charts → ledger).
+   Ledger-house palette: green-grey paper neutrals, copper accent, semantic in/out/warn kept separate. */
+:root{
+  --bg:#eef1ef; --surface:#ffffff; --surface-2:#f5f7f6; --ink:#14201c; --muted:#5a6a64; --line:#dce3df; --line-2:#c9d3ce;
+  --accent:#a24f28; --accent-ink:#ffffff; --accent-soft:#f5e4da;
+  --in:#1b7a4e; --in-soft:#ddf0e5; --out:#ad3537; --out-soft:#f7e1e1; --warn:#946010; --warn-soft:#f5ead2;
+  --c1:#2f6f9f; --c2:#b0602e; --c3:#5a8a36; --c4:#8a4f9e; --c5:#a8831a; --c6:#2f8a85;
+  --shadow:0 1px 2px rgb(20 32 28 / .06), 0 6px 20px rgb(20 32 28 / .05);
+  --f-display:'Readex Pro', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  --f-body:'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-mono:'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0d1211; --surface:#141b19; --surface-2:#1a2321; --ink:#e4ebe8; --muted:#8c9b95; --line:#24302c; --line-2:#33413c;
+  --accent:#e38c5b; --accent-ink:#1b0f08; --accent-soft:#38231a;
+  --in:#52c58d; --in-soft:#153024; --out:#ef7272; --out-soft:#3a1c1d; --warn:#e0ac55; --warn-soft:#342914;
+  --c1:#6aa8d6; --c2:#e38c5b; --c3:#8fc164; --c4:#c28ad4; --c5:#dcb84c; --c6:#5cc3bc;
+  --shadow:0 1px 2px rgb(0 0 0 / .3), 0 6px 20px rgb(0 0 0 / .25); color-scheme:dark; }}
+:root[data-theme="dark"]{
+  --bg:#0d1211; --surface:#141b19; --surface-2:#1a2321; --ink:#e4ebe8; --muted:#8c9b95; --line:#24302c; --line-2:#33413c;
+  --accent:#e38c5b; --accent-ink:#1b0f08; --accent-soft:#38231a;
+  --in:#52c58d; --in-soft:#153024; --out:#ef7272; --out-soft:#3a1c1d; --warn:#e0ac55; --warn-soft:#342914;
+  --c1:#6aa8d6; --c2:#e38c5b; --c3:#8fc164; --c4:#c28ad4; --c5:#dcb84c; --c6:#5cc3bc;
+  --shadow:0 1px 2px rgb(0 0 0 / .3), 0 6px 20px rgb(0 0 0 / .25); color-scheme:dark; }
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg); color:var(--ink); font:14px/1.5 var(--f-body); margin:0}
+button,input,select,textarea{font:inherit; color:inherit}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.num,.mono{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:var(--f-display); font-weight:600; margin:0; text-wrap:balance; letter-spacing:-.01em}
+.ar{font-family:var(--f-body); color:var(--muted); font-weight:400; letter-spacing:0}
+
+/* shell */
+.app{display:grid; grid-template-columns:232px minmax(0,1fr); min-height:100%}
+.side{background:var(--surface); border-right:1px solid var(--line); padding:20px 14px; display:flex; flex-direction:column; gap:22px; position:sticky; top:0; height:100vh; overflow:auto}
+.mark{display:flex; align-items:center; gap:10px; padding:0 8px}
+.mark b{font-family:var(--f-display); font-size:17px; font-weight:700}
+.mark .logo{width:30px; height:30px; border-radius:8px; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; font-family:var(--f-display); font-weight:700}
+.nav{display:flex; flex-direction:column; gap:2px}
+.nav-h{font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); padding:0 10px 6px}
+.nav a{display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; text-decoration:none; color:var(--muted); font-weight:500}
+.nav a:hover{background:var(--surface-2); color:var(--ink)}
+.nav a.on{background:var(--accent-soft); color:var(--ink)}
+.nav a.on svg{color:var(--accent)}
+.nav a.sub{padding:6px 10px 6px 38px; font-size:13px; font-weight:400; position:relative}
+.nav a.sub::before{content:""; position:absolute; left:19px; top:0; bottom:0; border-left:1px solid var(--line-2)}
+.nav a.sub.on{background:none; color:var(--accent); font-weight:600}
+.nav a.sub.on::before{border-left:2px solid var(--accent)}
+.nav a .badge{margin-left:auto}
+.nav svg{width:18px; height:18px; flex:none}
+.side-foot{margin-top:auto; display:flex; flex-direction:column; gap:6px}
+.side-foot button{display:flex; align-items:center; gap:10px; padding:8px 10px; border:0; background:none; border-radius:8px; color:var(--muted); cursor:pointer; text-align:left}
+.side-foot button:hover{background:var(--surface-2); color:var(--ink)}
+.side-foot svg{width:16px;height:16px}
+
+.main{min-width:0; display:flex; flex-direction:column}
+.top{position:sticky; top:env(safe-area-inset-top,0px); z-index:5; background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); padding:12px 28px; display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+.crumb{display:flex; flex-direction:column; min-width:0; margin-right:auto}
+.crumb small{color:var(--muted); font-size:12px}
+.crumb small a{color:inherit; text-decoration:none}
+.crumb small a:hover{color:var(--accent)}
+.crumb h1{font-size:20px}
+.content{padding:24px 28px 48px; display:flex; flex-direction:column; gap:18px; max-width:1320px; width:100%}
+
+/* controls */
+.btn{display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line-2); background:var(--surface); padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:500; white-space:nowrap; text-decoration:none}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost{background:none; border-color:transparent}
+.btn.sm{padding:5px 10px; font-size:13px}
+.btn svg{width:16px; height:16px}
+select.sel{border:1px solid var(--line-2); background:var(--surface); padding:8px 30px 8px 12px; border-radius:8px; cursor:pointer}
+.chips{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+.chip{display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); background:var(--surface); padding:6px 12px; border-radius:999px; cursor:pointer; font-weight:500; color:var(--muted)}
+.chip:hover{color:var(--ink); border-color:var(--line-2)}
+.chip.on{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+.chip.add{border-style:dashed}
+.grp{display:inline-flex; align-items:center; gap:4px; padding:3px 4px 3px 10px; border:1px solid var(--line); border-radius:999px; background:var(--surface-2)}
+.grp > span{font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-right:4px}
+.grp .chip{padding:4px 10px}
+.dot{width:9px; height:9px; border-radius:50%; background:var(--dc, var(--muted)); display:inline-block; flex:none}
+.badge{font-size:11px; font-weight:600; padding:1px 7px; border-radius:999px; background:var(--out-soft); color:var(--out)}
+.badge.w{background:var(--warn-soft); color:var(--warn)}
+.toolbar{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+.toolbar .sp{margin-left:auto}
+
+/* sales sub-navigation */
+.subnav{display:flex; gap:4px; padding:4px; background:var(--surface); border:1px solid var(--line); border-radius:12px; overflow-x:auto; width:max-content; max-width:100%}
+.subnav a{display:flex; gap:8px; align-items:baseline; padding:7px 14px; border-radius:8px; text-decoration:none; color:var(--muted); font-weight:500; white-space:nowrap}
+.subnav a:hover{color:var(--ink); background:var(--surface-2)}
+.subnav a.on{background:var(--ink); color:var(--bg)}
+.subnav a.on .ar{color:inherit; opacity:.75}
+.subnav .ar{font-size:12px}
+
+/* panels */
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:18px 20px; min-width:0}
+.panel-h{display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap}
+.panel-h h2{font-size:15px}
+.panel-h .sp{margin-left:auto}
+.panel-note{color:var(--muted); font-size:12px; margin:8px 0 0}
+.grid{display:grid; gap:16px}
+.g-2-1{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.g-1-1{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+
+/* KPIs and widgets */
+.kpis{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px}
+.kpi{position:relative; display:flex; flex-direction:column; gap:4px; text-decoration:none; background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:16px 18px 12px; box-shadow:var(--shadow); transition:transform .15s, border-color .15s}
+.kpi:hover{transform:translateY(-2px); border-color:var(--accent)}
+.kpi-top{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
+.kpi-label{font-weight:600}
+.kpi-val{font-family:var(--f-display); font-size:28px; font-weight:600; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.2}
+.kpi-val small, .big small, .w-val small{font-size:12px; color:var(--muted); font-weight:500; margin-right:4px; font-family:var(--f-body); letter-spacing:0}
+.kpi-sub{color:var(--muted); font-size:12.5px}
+svg.spark{width:100%; height:38px; margin-top:6px; display:block}
+.kpi .go{position:absolute; right:14px; bottom:12px; font-size:12px; color:var(--accent); font-weight:600; opacity:0; transition:opacity .15s}
+.kpi:hover .go{opacity:1}
+
+.six{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px}
+.w{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:14px 16px 10px; display:flex; flex-direction:column; gap:2px; min-width:0}
+.w-h{display:flex; align-items:center; gap:8px; font-weight:600; font-size:13.5px}
+.w-h .n{font-family:var(--f-mono); font-size:11px; color:var(--muted); border:1px solid var(--line-2); border-radius:5px; padding:0 5px; font-weight:500}
+.w-h .ar{font-size:12px; margin-left:auto}
+.w-val{font-family:var(--f-display); font-size:24px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+.w-sub{font-size:12px; color:var(--muted)}
+.w.key{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset}
+
+/* landing tiles */
+.tiles{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px}
+.tile{display:flex; flex-direction:column; gap:12px; text-decoration:none; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:20px 22px 16px; box-shadow:var(--shadow); transition:border-color .15s, transform .15s; min-width:0}
+.tile:hover{border-color:var(--accent); transform:translateY(-2px)}
+.tile-h{display:flex; align-items:center; gap:12px}
+.tile-h .ico{width:38px; height:38px; border-radius:10px; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; flex:none}
+.tile-h .ico svg{width:20px; height:20px}
+.tile-h h2{font-size:18px}
+.tile-h .ar{font-size:13px}
+.tile .big{font-family:var(--f-display); font-size:30px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.15}
+.tile-f{display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--line); padding-top:10px; margin-top:auto; font-size:12.5px; color:var(--muted)}
+.tile-f b{color:var(--accent)}
+.minirows{display:flex; flex-direction:column; gap:6px}
+
+/* summary strip */
+.strip{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); background:var(--surface); border:1px solid var(--line); border-radius:var(--r)}
+.strip > div{padding:14px 18px; border-right:1px solid var(--line); min-width:0}
+.strip > div:last-child{border-right:0}
+.strip .lbl{font-size:12px; color:var(--muted); display:flex; gap:6px; align-items:baseline; flex-wrap:wrap}
+.strip .big{font-family:var(--f-display); font-size:21px; font-weight:600; font-variant-numeric:tabular-nums}
+.strip .hint{font-size:11.5px; color:var(--muted)}
+.strip .key{background:var(--surface-2)}
+.t-in{color:var(--in)} .t-out{color:var(--out)} .t-warn{color:var(--warn)} .t-acc{color:var(--accent)}
+
+/* hero figure (statement debt) */
+.hero{display:grid; grid-template-columns:minmax(0,1.2fr) repeat(3,minmax(0,1fr)); background:var(--surface); border:1px solid var(--line); border-radius:14px; overflow:hidden}
+.hero > div{padding:18px 20px; border-right:1px solid var(--line); min-width:0}
+.hero > div:last-child{border-right:0}
+.hero .debt{background:var(--out-soft)}
+.hero .debt .big{font-size:34px; color:var(--out)}
+.hero .big{font-family:var(--f-display); font-size:22px; font-weight:600; font-variant-numeric:tabular-nums}
+.hero .lbl{font-size:12.5px; color:var(--muted); display:flex; gap:6px; flex-wrap:wrap; align-items:baseline}
+.hero .debt .lbl{color:var(--out)}
+.hero .hint{font-size:12px; color:var(--muted)}
+
+/* tables */
+.tbl-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:var(--r); background:var(--surface)}
+table{width:100%; border-collapse:collapse; font-size:13.5px}
+th{font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:600; text-align:left; padding:10px 14px; background:var(--surface-2); border-bottom:1px solid var(--line); white-space:nowrap}
+td{padding:9px 14px; border-bottom:1px solid var(--line); vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:var(--surface-2)}
+td.r, th.r{text-align:right}
+td.num{white-space:nowrap}
+tr.bf td{background:var(--surface-2); color:var(--muted); font-style:italic}
+tr.miss td{color:var(--muted)}
+tfoot td{font-weight:600; background:var(--surface-2); border-top:1px solid var(--line-2); border-bottom:0}
+.muted{color:var(--muted)}
+.cellname{display:flex; align-items:center; gap:8px; white-space:nowrap}
+.sub{display:block; color:var(--muted); font-size:12px}
+.empty{padding:36px; text-align:center; color:var(--muted); border:1px dashed var(--line-2); border-radius:var(--r)}
+.link{background:none; border:0; color:var(--accent); cursor:pointer; font-weight:600; padding:0; text-decoration:none; font-size:13px}
+.icon-btn{background:none; border:0; color:var(--muted); cursor:pointer; padding:4px; border-radius:6px; line-height:0}
+.icon-btn:hover{color:var(--out); background:var(--out-soft)}
+.icon-btn svg{width:15px; height:15px}
+
+.pill{display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; padding:2px 9px; border-radius:999px; white-space:nowrap}
+.pill::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor}
+.p-in{background:var(--in-soft); color:var(--in)}
+.p-warn{background:var(--warn-soft); color:var(--warn)}
+.p-mute{background:var(--surface-2); color:var(--muted)}
+.p-out{background:var(--out-soft); color:var(--out)}
+.tag{font-size:11.5px; padding:2px 8px; border-radius:6px; background:var(--surface-2); border:1px solid var(--line); color:var(--muted); white-space:nowrap}
+
+/* charts */
+svg text{fill:var(--muted); font:11px var(--f-mono)}
+svg .vt{fill:var(--ink); font-weight:500}
+.chart{width:100%; display:block}
+.legend{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted)}
+.legend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px}
+.hbar{display:grid; grid-template-columns:minmax(80px,130px) minmax(0,1fr) auto; gap:10px; align-items:center; font-size:13px; padding:5px 0}
+.hbar .track{height:10px; background:var(--surface-2); border-radius:6px; overflow:hidden; display:flex}
+.hbar .fill{height:100%; border-radius:6px}
+.hbar .num{text-align:right; font-size:12.5px}
+.donut-wrap{display:flex; gap:18px; align-items:center; flex-wrap:wrap}
+.donut-wrap svg{width:150px; height:150px; flex:none}
+.donut-legend{display:flex; flex-direction:column; gap:7px; font-size:13px; flex:1; min-width:140px}
+.donut-legend div{display:flex; align-items:center; gap:8px}
+.donut-legend .num{margin-left:auto}
+
+/* today list */
+.today{display:flex; flex-direction:column; gap:8px}
+.today-row{display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 10px; padding:10px 12px; border-radius:8px; background:var(--surface-2); align-items:center}
+.today-row .vals{grid-column:1/-1; display:flex; gap:14px; font-size:12.5px; color:var(--muted)}
+.today-row .vals b{color:var(--ink); font-family:var(--f-mono); font-weight:500}
+
+/* quick-entry bar */
+.quick{display:grid; grid-template-columns:150px 160px 140px minmax(0,1fr) auto; gap:8px; align-items:end; background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:14px 16px}
+.quick.inv{grid-template-columns:150px 160px 130px 140px minmax(0,1fr) auto}
+.quick .fld label{font-size:12px; font-weight:600}
+.quick .fld input, .quick .fld select{border:1px solid var(--line-2); background:var(--surface); border-radius:8px; padding:8px 10px; width:100%}
+.quick .qh{grid-column:1/-1; display:flex; gap:8px; align-items:baseline; font-size:12.5px; color:var(--muted)}
+.quick .qh b{color:var(--ink); font-size:14px}
+.search{border:1px solid var(--line-2); background:var(--surface); border-radius:8px; padding:7px 11px; min-width:0; width:220px; max-width:100%}
+
+/* attention */
+.alerts{display:flex; flex-direction:column; gap:8px}
+.alert{display:flex; gap:12px; padding:10px 12px; border-radius:8px; background:var(--surface-2); border:0; border-left:3px solid var(--sev, var(--muted)); cursor:pointer; text-align:left; width:100%}
+.alert:hover{filter:brightness(.98)}
+.alert b{display:block; font-weight:600}
+.alert span{font-size:12.5px; color:var(--muted)}
+
+/* safes */
+.safe{display:flex; flex-direction:column; gap:14px; cursor:pointer; text-align:left; border:1px solid var(--line); background:var(--surface); border-radius:var(--r); padding:20px; position:relative}
+.safe.on{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
+.safe .big{font-family:var(--f-display); font-size:32px; font-weight:600; font-variant-numeric:tabular-nums}
+.safe-h{display:flex; align-items:center; gap:10px}
+.safe-h svg{width:22px; height:22px; color:var(--accent)}
+.rule{font-size:12.5px; color:var(--muted); display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--line); padding-top:12px}
+.meter{height:6px; background:var(--surface-2); border-radius:6px; overflow:hidden}
+.meter i{display:block; height:100%; background:var(--in)}
+.meter.low i{background:var(--out)}
+.io{display:flex; gap:18px; font-size:13px; flex-wrap:wrap}
+
+/* dialog */
+dialog{border:1px solid var(--line); border-radius:14px; background:var(--surface); color:var(--ink); padding:0; width:min(560px, calc(100vw - 32px)); box-shadow:0 24px 60px rgb(0 0 0 / .25)}
+dialog::backdrop{background:rgb(10 16 14 / .45)}
+.dlg-h{padding:18px 22px 4px; display:flex; align-items:baseline; gap:10px}
+.dlg-h h2{font-size:18px}
+form.f{padding:12px 22px 20px; display:grid; grid-template-columns:1fr 1fr; gap:14px}
+.fld{display:flex; flex-direction:column; gap:5px; min-width:0}
+.fld.full, .full{grid-column:1/-1}
+.fld label, .fld .lab{font-size:12.5px; font-weight:600}
+.fld input,.fld select,.fld textarea{border:1px solid var(--line-2); background:var(--surface); border-radius:8px; padding:9px 11px; width:100%}
+.fld .hint{font-size:12px; color:var(--muted)}
+.fld .warnhint{font-size:12px; color:var(--warn)}
+.seg{display:flex; border:1px solid var(--line-2); border-radius:8px; overflow:hidden}
+.seg label{flex:1; position:relative; text-align:center; padding:8px 6px; cursor:pointer; font-weight:500; font-size:13px; border-right:1px solid var(--line-2)}
+.seg label:last-child{border-right:0}
+.seg input{position:absolute; opacity:0; pointer-events:none}
+.seg label:has(input:checked){background:var(--ink); color:var(--bg)}
+.seg label:has(input:disabled){color:var(--muted); cursor:not-allowed; text-decoration:line-through; opacity:.6}
+.seg label:has(input:focus-visible){outline:2px solid var(--accent); outline-offset:-2px}
+.f-actions{grid-column:1/-1; display:flex; justify-content:flex-end; gap:8px; padding-top:4px}
+.f-err{grid-column:1/-1; background:var(--out-soft); color:var(--out); padding:8px 12px; border-radius:8px; font-size:13px}
+.sheet td{padding:6px 8px}
+.sheet input{width:100%; min-width:80px; border:1px solid var(--line-2); background:var(--surface); border-radius:6px; padding:7px 8px; text-align:right; font-family:var(--f-mono)}
+.choose{padding:12px 22px 22px; display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.choose h3{grid-column:1/-1; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-family:var(--f-body); font-weight:600; margin-top:6px}
+.choose button{display:flex; flex-direction:column; align-items:flex-start; gap:2px; text-align:left; padding:11px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); cursor:pointer}
+.choose button:hover{border-color:var(--accent)}
+.choose button b{font-weight:600}
+.choose button span{font-size:12px; color:var(--muted)}
+.toast{position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 16px; border-radius:10px; font-weight:500; z-index:50; box-shadow:var(--shadow); display:flex; gap:14px; align-items:center}
+.toast button{background:none; border:0; color:var(--accent); font-weight:700; cursor:pointer; padding:0}
+.sample{font-size:11.5px; color:var(--warn); background:var(--warn-soft); padding:3px 9px; border-radius:6px; font-weight:600}
+.row-actions{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+
+@media (max-width:1100px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .g-2-1{grid-template-columns:minmax(0,1fr)}
+  .six{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hero{grid-template-columns:repeat(2,minmax(0,1fr))} .hero .debt{grid-column:1/-1}
+  .quick, .quick.inv{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:static; height:auto; flex-direction:row; align-items:center; padding:10px 16px; gap:12px; overflow-x:auto; border-right:0; border-bottom:1px solid var(--line)}
+  .side .nav-h, .side-foot span, .mark b, .nav a.sub{display:none}
+  .nav{flex-direction:row}
+  .nav a{white-space:nowrap; padding:8px 10px}
+  .side-foot{margin:0 0 0 auto; flex-direction:row}
+  .top{padding:10px 16px}
+  .content{padding:16px 16px 40px}
+  .g-2, .g-1-1, .tiles{grid-template-columns:minmax(0,1fr)}
+  .strip > div{border-right:0; border-bottom:1px solid var(--line)}
+}
+@media (max-width:520px){
+  .kpis, .six, .hero{grid-template-columns:minmax(0,1fr)}
+  .hero > div{border-right:0; border-bottom:1px solid var(--line)}
+  form.f, .choose, .quick, .quick.inv{grid-template-columns:1fr}
+  .nav a span.lbl{display:none}
+}
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="mark"><span class="logo">F</span><b>Finance Hub</b></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <button type="button" data-act="theme" title="Switch theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><span>Theme</span></button>
+      <button type="button" data-act="reset" title="Reset sample data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span>Reset sample data</span></button>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <div class="crumb"><small id="crumb-sub"></small><h1 id="crumb-title"></h1></div>
+      <span class="sample" title="All figures are generated examples for this proof of concept">Sample data</span>
+      <label for="period" class="muted" style="font-size:12px">Period</label>
+      <select id="period" class="sel">
+        <option value="today">Today</option>
+        <option value="month">This month</option>
+        <option value="3m">Last 3 months</option>
+        <option value="ytd">This year</option>
+        <option value="all">All time</option>
+      </select>
+      <button class="btn primary" type="button" data-act="new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New entry</button>
+    </header>
+    <main class="content" id="view"></main>
+  </div>
+</div>
+<dialog id="dlg"></dialog>
+
+<script>
+/* ============ constants & rules ============ */
+const MAIN_ALLOWED = ['Rent','Salaries','Commissions','Factory payments','Raw materials','Utilities','Taxes & insurance','Loan installments','Owner withdrawal','Transfer to office safe'];
+const OFFICE_ALLOWED = ['Supermarket','Transport','Cleaning','Hospitality','Stationery','Maintenance','Courier','Other petty cash'];
+const PROD_EXP = ['Raw materials','Salaries','Rent','Utilities','Maintenance','Transport','Cleaning','Stationery','Hospitality','Equipment','Other petty cash'];
+const PROD_IN = ['Storage fees','Printing jobs','Course fees','Other income'];
+const CHANNELS = ['Facebook & Instagram ads','TikTok ads','Google ads','Influencers','Flyers & printing'];
+const SAFE_IN = ['Owner deposit','Other income'];
+const PAY_METHODS = ['Cash','Bank transfer','InstaPay'];
+const SAFE_NAMES = {main:['Main safe','الخزنة الرئيسية'], office:['Office safe','خزنة المكتب'], bank:['Bank / card','بنك']};
+const isTransfer = t => t.category === 'Transfer to office safe' || t.category === 'Transfer from main safe';
+const mktCategory = ch => ch === 'Influencers' ? 'Commissions' : ch;
+/* The one rule both safes enforce: what each safe may pay for. */
+function allowedFrom(safe, category){
+  if (safe === 'main') return MAIN_ALLOWED.includes(category);
+  if (safe === 'office') return OFFICE_ALLOWED.includes(category);
+  return true;
+}
+
+/* ============ dates & format ============ */
+const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const parse = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const addDays = (s,n) => { const d = parse(s); d.setDate(d.getDate()+n); return iso(d); };
+const TODAY_S = iso(TODAY);
+const nf = new Intl.NumberFormat('en-US', {maximumFractionDigits:0});
+const fmt = n => nf.format(Math.round(n));
+const fmtK = n => Math.abs(n) >= 1e6 ? (n/1e6).toFixed(n % 1e6 ? 1 : 0) + 'M' : Math.abs(n) >= 1000 ? fmt(n/1000) + 'k' : fmt(n);
+const fmtDate = s => parse(s).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+const fmtDay = s => parse(s).toLocaleDateString('en-GB', {weekday:'short', day:'2-digit', month:'short'});
+const monLabel = d => d.toLocaleDateString('en-GB', {month:'short'});
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sum = (a, f = x => x.amount) => a.reduce((s,x) => s + (+f(x) || 0), 0);
+const byDate = (a,b) => a.date.localeCompare(b.date);
+const money = n => `<small>EGP</small>${fmt(n)}`;
+const amt = (n, cls='') => n ? `<span class="num ${cls}">${fmt(n)}</span>` : '<span class="muted">—</span>';
+const pct = (a,b) => b ? (a/b*100).toFixed(1) + '%' : '—';
+const lastDays = n => { const a = []; for (let k = n-1; k >= 0; k--) a.push(addDays(TODAY_S, -k)); return a; };
+const byDay = (list, val = x => x.amount) => { const m = new Map(); for (const x of list) m.set(x.date, (m.get(x.date) || 0) + (+val(x) || 0)); return m; };
+
+/* ============ sample data ============ */
+function mulberry32(a){ return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function seed(){
+  const R = mulberry32(20261008);
+  const rnd = (a,b) => Math.round(a + R()*(b-a));
+  const pick = a => a[Math.floor(R()*a.length)];
+  let n = 0; const id = p => p + (++n).toString(36);
+  const months = []; for (let k = 5; k >= 0; k--) months.push(new Date(TODAY.getFullYear(), TODAY.getMonth()-k, 1));
+  const dayIn = (m, lo=1, hi=31) => {
+    const last = new Date(m.getFullYear(), m.getMonth()+1, 0).getDate();
+    const cap = (m.getMonth() === TODAY.getMonth() && m.getFullYear() === TODAY.getFullYear()) ? TODAY.getDate() : last;
+    const top = Math.max(1, Math.min(hi, cap)), bot = Math.min(lo, top);
+    return iso(new Date(m.getFullYear(), m.getMonth(), rnd(bot, top)));
+  };
+  const factories = [
+    {id:'f1', name:'Blanc', ar:'مصنع بلانك'},
+    {id:'f2', name:'Fourteen', ar:'مصنع فورتين'},
+    {id:'f3', name:'OneOSeven', ar:'مصنع وان أو سفن'},
+  ];
+  const brands = [
+    {id:'b1', name:'Blanc', code:'BL', factoryId:'f1', color:0},
+    {id:'b2', name:'Lady Blanc', code:'LB', factoryId:'f1', color:3},
+    {id:'b3', name:'Fourteen', code:'FT', factoryId:'f2', color:1},
+    {id:'b4', name:'OneOSeven', code:'OS', factoryId:'f3', color:2},
+  ];
+  const scale = {b1:1, b2:.55, b3:.8, b4:.7};
+  const payBand = {f1:[115,130], f2:[58,68], f3:[50,60]};
+  const sections = [
+    {id:'s1', name:'Warehouses', ar:'المخازن', inCat:'Storage fees', exp:['Rent','Utilities','Maintenance','Cleaning'], items:['Cartons','Packaging rolls','Finished goods']},
+    {id:'s2', name:'Printing', ar:'الطباعة', inCat:'Printing jobs', exp:['Raw materials','Maintenance','Equipment'], items:['Printed bags','Labels','Brochures']},
+    {id:'s3', name:'Course', ar:'الكورس', inCat:'Course fees', exp:['Rent','Hospitality','Stationery'], items:['Course kits','Workbooks']},
+    {id:'s4', name:'Others', ar:'أخرى', inCat:'Other income', exp:['Transport','Other petty cash','Utilities'], items:['Samples','Spare parts']},
+  ];
+  const txns = [], stock = [], daily = [], invoices = [], flyers = [], moves = [];
+  const T = o => { const t = {id:id('t'), ...o}; txns.push(t); return t; };
+
+  /* Online sales, day by day */
+  const days = []; for (let d = new Date(months[0]); d <= TODAY; d.setDate(d.getDate()+1)) days.push(iso(d));
+  const debt = {f1:0, f2:0, f3:0}, acc = {}, dn = {}, inv = {};
+  brands.forEach(b => { const a = Math.round(scale[b.id]*150)*1000; dn[b.id] = 100; inv[b.id] = 1000;
+    stock.push({id:id('s'), factoryId:b.factoryId, brandId:b.id, date:days[0], amount:a, ref:`DN-${b.code}-${++dn[b.id]}`, note:'Opening delivery'}); debt[b.factoryId] += a; });
+  days.forEach((day, di) => {
+    const dow = parse(day).getDay(), boost = (dow === 4 || dow === 5) ? 1.25 : 1;
+    brands.forEach((b, bi) => {
+      if (di > 0 && (di + bi*3) % 10 === 0){
+        const a = Math.round(scale[b.id]*rnd(62,80))*1000;
+        stock.push({id:id('s'), factoryId:b.factoryId, brandId:b.id, date:day, amount:a, ref:`DN-${b.code}-${++dn[b.id]}`, note:'Stock delivery'}); debt[b.factoryId] += a;
+      }
+      if (day === TODAY_S && bi >= 2) return; // today's numbers not entered yet for two brands
+      const sold = Math.round(scale[b.id]*boost*rnd(4500,10000)/10)*10;
+      const returned = Math.round(sold*rnd(3,14)/1000)*10;
+      const shipping = Math.round(scale[b.id]*rnd(25,110))*10;
+      daily.push({id:id('d'), date:day, brandId:b.id, sold, returned, shipping});
+      acc[b.id] = (acc[b.id] || 0) + sold - returned;
+      if ((di + bi) % 3 === 2){
+        const a = Math.round(acc[b.id]*.97/100)*100; acc[b.id] = 0;
+        if (a > 0) T({module:'sales', kind:'collection', dir:'in', brandId:b.id, date:day, amount:a, category:'Sales collection', safe:'main', desc:'Collected from shipping co.'});
+      }
+      if (R() < .55) invoices.push({id:id('i'), date:day, brandId:b.id, no:`${b.code}-${++inv[b.id]}`, amount:rnd(10,80)*100, note:pick(['Fabric','Packaging','Accessories','Labels','Hangers','Tailoring'])});
+    });
+    if (di % 14 === 7) for (const f of factories){
+      const [lo, hi] = payBand[f.id]; const a = Math.min(debt[f.id], rnd(lo, hi)*1000);
+      if (a > 0){ T({module:'sales', kind:'factory-pay', dir:'out', factoryId:f.id, date:day, amount:a, category:'Factory payments', safe:'main', method:pick(PAY_METHODS), desc:'Payment to factory'}); debt[f.id] -= a; }
+    }
+  });
+  for (const m of months) for (const b of brands) for (let k = rnd(1,3); k > 0; k--)
+    flyers.push({id:id('y'), date:dayIn(m), brandId:b.id, amount:rnd(8,30)*100, qty:rnd(5,30)*100, note:'Order inserts'});
+
+  /* Production */
+  for (const s of sections){
+    for (const m of months){
+      for (const c of s.exp){
+        if (R() < .35) continue;
+        const safe = MAIN_ALLOWED.includes(c) ? 'main' : OFFICE_ALLOWED.includes(c) ? 'office' : 'bank';
+        const amount = safe === 'office' ? rnd(2,14)*100 : rnd(3,8)*1000 + rnd(0,9)*100;
+        T({module:'production', dir:'out', sectionId:s.id, date:dayIn(m), amount, category:c, safe, desc:`${c} — ${s.name.toLowerCase()}`, receipt: safe === 'office' ? R() > .2 : undefined});
+      }
+      for (let k = 0; k < 2; k++) T({module:'production', dir:'in', sectionId:s.id, date:dayIn(m), amount:rnd(3,11)*1000, category:s.inCat, safe:'main', desc:s.inCat});
+      for (let k = 0; k < 2; k++){
+        moves.push({id:id('m'), sectionId:s.id, dir:'in', date:dayIn(m), item:pick(s.items), qty:rnd(10,60)*10});
+        moves.push({id:id('m'), sectionId:s.id, dir:'out', date:dayIn(m), item:pick(s.items), qty:rnd(8,50)*10});
+      }
+    }
+  }
+  /* Marketing */
+  for (const m of months){
+    for (const ch of CHANNELS){
+      if (R() < .2) continue;
+      const cat = mktCategory(ch);
+      T({module:'marketing', dir:'out', channel:ch, date:dayIn(m), amount:rnd(15,110)*100, category:cat, safe: cat === 'Commissions' ? 'main' : 'bank', desc: ch === 'Influencers' ? 'Influencer campaign' : 'Ad spend'});
+    }
+    if (R() < .4) T({module:'marketing', dir:'in', channel:pick(CHANNELS.slice(0,3)), date:dayIn(m), amount:rnd(5,25)*100, category:'Ad credit refund', safe:'bank', desc:'Unused ad credit refunded'});
+  }
+  /* Safes: direct entries + transfers */
+  for (const m of months){
+    T({module:'safe', dir:'out', date:dayIn(m,1,5), amount:15000, category:'Rent', safe:'main', desc:'Office & warehouse rent'});
+    T({module:'safe', dir:'out', date:dayIn(m,25,28), amount:rnd(33,37)*1000, category:'Salaries', safe:'main', desc:'Monthly payroll'});
+    T({module:'safe', dir:'out', date:dayIn(m), amount:rnd(30,70)*100, category:'Commissions', safe:'main', desc:'Sales team commissions'});
+    T({module:'safe', dir:'out', date:dayIn(m), amount:rnd(18,35)*100, category:'Utilities', safe:'main', desc:'Electricity, water, internet'});
+    const td = dayIn(m,1,6);
+    T({module:'safe', dir:'out', date:td, amount:8000, category:'Transfer to office safe', safe:'main', desc:'Top-up office safe'});
+    T({module:'safe', dir:'in', date:td, amount:8000, category:'Transfer from main safe', safe:'office', desc:'Top-up from main safe'});
+    for (const [c, k, lo, hi] of [['Supermarket',3,15,70],['Transport',2,5,30],['Cleaning',1,10,25],['Hospitality',1,5,20],['Courier',1,5,15]])
+      for (let i = 0; i < k; i++) T({module:'safe', dir:'out', date:dayIn(m), amount:rnd(lo,hi)*10, category:c, safe:'office', desc:c === 'Supermarket' ? 'Supermarket receipt' : c, receipt:R() > .15});
+  }
+  return {v:2, factories, brands, sections, txns, stock, daily, invoices, flyers, moves,
+    safes:{main:{opening:180000, allowedOut:MAIN_ALLOWED}, office:{opening:3000, low:2500, allowedOut:OFFICE_ALLOWED}}};
+}
+
+/* ============ storage (per-viewer, optional) ============ */
+const KEY = 'finance-hub-poc-v2', UIKEY = 'finance-hub-ui-v2';
+function load(k){ try { const s = localStorage.getItem(k); return s ? JSON.parse(s) : null; } catch { return null; } }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch {} }
+function saveUI(){ try { localStorage.setItem(UIKEY, JSON.stringify(UI)); } catch {} }
+let DB = load(KEY) || seed();
+const UI = Object.assign({period:'month', brand:'all', factory:'f1', invQ:'', section:'all', prodTab:'expenses', mktFlow:'all', safe:'main', qDate:TODAY_S}, load(UIKEY) || {});
+UI.qDate = TODAY_S;
+const nid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+
+/* ============ period & queries ============ */
+function periodStart(){
+  const y = TODAY.getFullYear(), m = TODAY.getMonth();
+  return {today:TODAY_S, month:iso(new Date(y,m,1)), '3m':iso(new Date(y,m-2,1)), ytd:iso(new Date(y,0,1)), all:'0000-00-00'}[UI.period];
+}
+const PERIOD_LABEL = {today:'Today', month:'This month', '3m':'Last 3 months', ytd:'This year', all:'All time'};
+const inP = x => x.date >= periodStart() && x.date <= TODAY_S;
+const brand = id => DB.brands.find(b => b.id === id);
+const factory = id => DB.factories.find(f => f.id === id);
+const section = id => DB.sections.find(s => s.id === id);
+const brandsOf = fid => DB.brands.filter(b => b.factoryId === fid);
+const bColor = b => `var(--c${(b.color % 6) + 1})`;
+const brandDot = b => b ? `<i class="dot" style="--dc:${bColor(b)}"></i>` : '';
+const brandName = b => b ? `<span class="cellname">${brandDot(b)}${esc(b.name)}</span>` : '';
+const lastMonths = () => { const a = []; for (let k = 5; k >= 0; k--) a.push(new Date(TODAY.getFullYear(), TODAY.getMonth()-k, 1)); return a; };
+function monthly(list, f = x => x.amount){
+  return lastMonths().map(m => { const k = iso(m).slice(0,7); return sum(list.filter(x => x.date.slice(0,7) === k), f); });
+}
+const collections = () => DB.txns.filter(t => t.kind === 'collection');
+const factoryPays = () => DB.txns.filter(t => t.kind === 'factory-pay');
+function safeBalance(s){ const o = DB.safes[s].opening; return o + sum(DB.txns.filter(t => t.safe === s && t.date <= TODAY_S), t => t.dir === 'in' ? t.amount : -t.amount); }
+function factoryDebt(fid, upto = TODAY_S){
+  return sum(DB.stock.filter(s => s.factoryId === fid && s.date <= upto)) - sum(factoryPays().filter(t => t.factoryId === fid && t.date <= upto));
+}
+const totalDebt = () => sum(DB.factories, f => factoryDebt(f.id));
+/* Six figures per brand. Stock on hand = stock received − sold + returned (all time, to today). */
+function brandStats(bid){
+  const f = x => bid === 'all' || x.brandId === bid;
+  const daily = DB.daily.filter(d => f(d) && d.date <= TODAY_S), dP = daily.filter(inP);
+  const stock = DB.stock.filter(s => f(s) && s.date <= TODAY_S);
+  const sold = sum(dP, d => d.sold), returned = sum(dP, d => d.returned), shipping = sum(dP, d => d.shipping);
+  const stockIn = sum(stock.filter(inP));
+  const flyers = sum(DB.flyers.filter(x => f(x) && inP(x)));
+  const collected = sum(collections().filter(t => f(t) && inP(t)));
+  const onHand = sum(stock) - sum(daily, d => d.sold) + sum(daily, d => d.returned);
+  return {stockIn, sold, returned, shipping, flyers, collected, onHand, openHand: onHand - stockIn + sold - returned, net: sold - returned, rate: sold ? returned/sold : 0};
+}
+const enteredToday = () => DB.brands.filter(b => DB.daily.some(d => d.date === TODAY_S && d.brandId === b.id));
+
+/* ============ icons ============ */
+const ICON = {
+  home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  sales:'<path d="M5 7h14l-1.5 12h-11z"/><path d="M9 7a3 3 0 0 1 6 0"/>',
+  production:'<path d="M3 21V10l6 4V10l6 4V6l6 4v11z"/>',
+  marketing:'<path d="M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M17 9a4 4 0 0 1 0 6"/>',
+  safes:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="3.5"/><path d="M12 8.5V7M15.5 12H17"/>',
+  brands:'<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+  collections:'<rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 10v5M18 10v5"/>',
+  invoices:'<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h7M9 17h7"/>',
+  statement:'<path d="M4 4h16v16H4z"/><path d="M4 9h16M9 9v11"/>',
+  trash:'<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
+};
+const svgI = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round">${ICON[k]}</svg>`;
+
+/* ============ small renderers & charts ============ */
+function table(cols, rows, empty = 'No entries in this period.', foot = ''){
+  if (!rows.length) return `<div class="empty">${empty}</div>`;
+  return `<div class="tbl-wrap"><table><thead><tr>${cols.map(c => `<th class="${c.cls||''}">${c.h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr class="${r._cls||''}">${cols.map(c => `<td class="${c.cls||''}">${c.f(r)}</td>`).join('')}</tr>`).join('')}</tbody>${foot}</table></div>`;
+}
+const safeTag = s => s ? `<span class="tag">${SAFE_NAMES[s][0]}</span>` : '';
+const delBtn = (coll, id) => `<button class="icon-btn" data-act="del" data-c="${coll}" data-id="${id}" title="Delete entry" aria-label="Delete entry">${svgI('trash')}</button>`;
+function spark(vals, color){
+  const w = 200, h = 38, max = Math.max(...vals, 1), step = w / Math.max(1, vals.length - 1);
+  const pts = vals.map((v,i) => [i*step, h - 4 - (v/max)*(h-10)]);
+  const d = pts.map((p,i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const last = pts[pts.length-1];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+    <path d="${d} L${w} ${h} L0 ${h} Z" fill="${color}" opacity=".12"/>
+    <path d="${d}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/>
+    <circle cx="${Math.max(3, last[0]-3)}" cy="${last[1]}" r="3" fill="${color}"/></svg>`;
+}
+function miniBars(vals, color){
+  const w = 200, h = 40, max = Math.max(...vals, 1), cw = w / vals.length;
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">${vals.map((v,i) => {
+    const bh = Math.max(1, v/max*(h-4)); return `<rect x="${(i*cw + cw*.15).toFixed(1)}" y="${(h-bh).toFixed(1)}" width="${(cw*.7).toFixed(1)}" height="${bh.toFixed(1)}" rx="1.5" fill="${color}" opacity="${i === vals.length-1 ? 1 : .55}"/>`; }).join('')}</svg>`;
+}
+function niceMax(v){ if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1,1.2,1.5,2,2.5,3,4,5,6,8,10]) if (m*p >= v) return m*p; return 10*p; }
+/* Daily stacked bars; layers in `neg` hang below the zero line (e.g. returns). */
+function dailyChart(days, pos, neg = [], H = 230){
+  const W = 680, L = 48, B = 24, T = 10;
+  const pTot = days.map((_,i) => sum(pos, l => l.vals[i])), nTot = days.map((_,i) => sum(neg, l => l.vals[i]));
+  const maxP = niceMax(Math.max(...pTot, 1)), maxN = neg.length ? niceMax(Math.max(...nTot, 1)) : 0;
+  const ih = H - B - T, sc = ih / (maxP + maxN), zeroY = T + maxP*sc;
+  const cw = (W - L - 4) / days.length, bw = Math.max(2, cw*.7);
+  let g = '';
+  const ticks = [maxP, maxP/2, 0, ...(maxN ? [-maxN] : [])];
+  for (const v of ticks){ const y = zeroY - v*sc; g += `<line x1="${L}" x2="${W}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--line${v === 0 ? '-2' : ''})" ${v ? 'stroke-dasharray="3 4"' : ''}/><text x="${L-6}" y="${(y+4).toFixed(1)}" text-anchor="end">${fmtK(Math.abs(v))}</text>`; }
+  const every = Math.ceil(days.length / 7);
+  days.forEach((d,i) => {
+    const x = L + cw*i + (cw-bw)/2; let y = zeroY;
+    for (const l of pos){ const h = l.vals[i]*sc; if (h > 0){ y -= h; g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${l.color}"/>`; } }
+    let yn = zeroY;
+    for (const l of neg){ const h = l.vals[i]*sc; if (h > 0){ g += `<rect x="${x.toFixed(1)}" y="${yn.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${l.color}" opacity=".55"/>`; yn += h; } }
+    const tip = [fmtDay(d), ...pos.map(l => `${l.label}: ${fmt(l.vals[i])}`), ...neg.map(l => `${l.label}: −${fmt(l.vals[i])}`)].join('\n');
+    g += `<rect x="${(L + cw*i).toFixed(1)}" y="${T}" width="${cw.toFixed(1)}" height="${ih}" fill="transparent"><title>${esc(tip)}</title></rect>`;
+    if ((days.length - 1 - i) % every === 0) g += `<text x="${(x + bw/2).toFixed(1)}" y="${H-6}" text-anchor="middle" ${i === days.length-1 ? 'class="vt"' : ''}>${parse(d).getDate()} ${monLabel(parse(d))}</text>`;
+  });
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily chart">${g}</svg>`;
+}
+function lineChart(days, vals, color, H = 200){
+  const W = 680, L = 52, B = 24, T = 14, max = niceMax(Math.max(...vals, 1)), ih = H - B - T, cw = (W - L - 10) / Math.max(1, days.length - 1);
+  const y = v => T + ih - v/max*ih;
+  let g = '';
+  for (let k = 0; k <= 3; k++){ const v = max*k/3; g += `<line x1="${L}" x2="${W}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--line)" ${k ? 'stroke-dasharray="3 4"' : ''}/><text x="${L-6}" y="${(y(v)+4).toFixed(1)}" text-anchor="end">${fmtK(v)}</text>`; }
+  const pts = vals.map((v,i) => [L + i*cw, y(v)]);
+  const d = pts.map((p,i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  g += `<path d="${d} L${pts[pts.length-1][0].toFixed(1)} ${T+ih} L${L} ${T+ih} Z" fill="${color}" opacity=".12"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2"/>`;
+  const lp = pts[pts.length-1];
+  g += `<circle cx="${lp[0].toFixed(1)}" cy="${lp[1].toFixed(1)}" r="4" fill="${color}"/><text x="${(lp[0]-8).toFixed(1)}" y="${(lp[1]-9).toFixed(1)}" text-anchor="end" class="vt">${fmt(vals[vals.length-1])}</text>`;
+  const every = Math.ceil(days.length / 6);
+  days.forEach((dd,i) => { if ((days.length-1-i) % every === 0) g += `<text x="${(L + i*cw).toFixed(1)}" y="${H-6}" text-anchor="middle">${parse(dd).getDate()} ${monLabel(parse(dd))}</text>`; });
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Balance over time">${g}</svg>`;
+}
+function donut(parts, centerTop, centerVal){
+  const tot = sum(parts, p => p.v) || 1, r = 52, C = 2*Math.PI*r; let off = 0;
+  const arcs = parts.filter(p => p.v > 0).map(p => { const len = p.v/tot*C; const s = `<circle cx="75" cy="75" r="${r}" fill="none" stroke="${p.color}" stroke-width="20" stroke-dasharray="${Math.max(0, len-1.5).toFixed(2)} ${(C-len+1.5).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 75 75)"><title>${esc(p.label)}: ${fmt(p.v)}</title></circle>`; off += len; return s; }).join('');
+  return `<div class="donut-wrap"><svg viewBox="0 0 150 150" role="img" aria-label="${esc(centerTop)}"><circle cx="75" cy="75" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="20"/>${arcs}
+    <text x="75" y="70" text-anchor="middle">${esc(centerTop)}</text><text x="75" y="88" text-anchor="middle" class="vt" style="font-size:14px">${centerVal}</text></svg>
+    <div class="donut-legend">${parts.map(p => `<div><i class="dot" style="--dc:${p.color}"></i>${esc(p.label)}<span class="num">${(p.v/tot*100).toFixed(0)}%</span></div>`).join('')}</div></div>`;
+}
+/* Stock flow: opening → + received → − sold → + returned → on hand */
+function waterfall(s){
+  const steps = [
+    {l:'Opening', v:s.openHand, t:'total'}, {l:'+ Received', v:s.stockIn, t:'up'}, {l:'− Sold', v:-s.sold, t:'down'},
+    {l:'+ Returned', v:s.returned, t:'up'}, {l:'On hand', v:s.onHand, t:'total'}];
+  const W = 680, H = 230, L = 10, B = 26, T = 22; let run = 0; const bars = [];
+  for (const st of steps){ if (st.t === 'total'){ bars.push({...st, a:0, b:st.v}); run = st.v; } else { bars.push({...st, a:run, b:run + st.v}); run += st.v; } }
+  const max = niceMax(Math.max(...bars.map(b => Math.max(b.a, b.b)), 1)), min = Math.min(0, ...bars.map(b => Math.min(b.a, b.b)));
+  const ih = H - B - T, y = v => T + ih - (v - min)/(max - min)*ih, cw = (W - L) / bars.length, bw = cw*.56;
+  let g = `<line x1="${L}" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line-2)"/>`;
+  bars.forEach((b,i) => {
+    const x = L + cw*i + (cw-bw)/2, top = y(Math.max(b.a,b.b)), h = Math.max(1, Math.abs(y(b.a) - y(b.b)));
+    const col = b.t === 'total' ? 'var(--c1)' : b.t === 'up' ? 'var(--in)' : 'var(--out)';
+    g += `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${col}" ${b.t === 'total' ? '' : 'opacity=".85"'}/>`;
+    if (i < bars.length-1) g += `<line x1="${(x+bw).toFixed(1)}" x2="${(x+cw).toFixed(1)}" y1="${y(b.b).toFixed(1)}" y2="${y(b.b).toFixed(1)}" stroke="var(--muted)" stroke-dasharray="2 3"/>`;
+    g += `<text x="${(x+bw/2).toFixed(1)}" y="${(top-6).toFixed(1)}" text-anchor="middle" class="vt">${fmtK(b.t === 'total' ? b.v : Math.abs(b.v))}</text>`;
+    g += `<text x="${(x+bw/2).toFixed(1)}" y="${H-8}" text-anchor="middle">${b.l}</text>`;
+  });
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Stock flow for the period">${g}</svg>`;
+}
+function hbars(rows){
+  const max = Math.max(...rows.map(r => r.v), 1);
+  return rows.map(r => `<div class="hbar"><span class="cellname">${r.label}</span><span class="track"><span class="fill" style="width:${(r.v/max*100).toFixed(1)}%; background:${r.color}"></span></span><span class="num">${r.text ?? fmt(r.v)}</span></div>`).join('');
+}
+function cashflowChart(){
+  const ms = lastMonths(), all = DB.txns.filter(t => !isTransfer(t) && t.date <= TODAY_S);
+  const ins = monthly(all.filter(t => t.dir === 'in')), outs = monthly(all.filter(t => t.dir === 'out'));
+  const W = 640, H = 240, L = 52, B = 26, T = 10, max = niceMax(Math.max(...ins, ...outs));
+  const ih = H - B - T, cw = (W - L - 8) / ms.length, bw = Math.min(22, cw/3.2);
+  const y = v => T + ih - v/max*ih;
+  let g = '';
+  for (let k = 0; k <= 4; k++){ const v = max*k/4; g += `<line x1="${L}" x2="${W-4}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" ${k ? 'stroke-dasharray="3 4"' : ''}/><text x="${L-8}" y="${y(v)+4}" text-anchor="end">${fmtK(v)}</text>`; }
+  ms.forEach((m,i) => {
+    const cx = L + cw*i + cw/2;
+    g += `<rect x="${cx-bw-2}" y="${y(ins[i])}" width="${bw}" height="${ih+T-y(ins[i])}" rx="3" fill="var(--in)"><title>${monLabel(m)} in: EGP ${fmt(ins[i])}</title></rect>`;
+    g += `<rect x="${cx+2}" y="${y(outs[i])}" width="${bw}" height="${ih+T-y(outs[i])}" rx="3" fill="var(--out)" opacity=".85"><title>${monLabel(m)} out: EGP ${fmt(outs[i])}</title></rect>`;
+    g += `<text x="${cx}" y="${H-8}" text-anchor="middle" ${i === ms.length-1 ? 'class="vt"' : ''}>${monLabel(m)}</text>`;
+  });
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Money in and out for the last six months">${g}</svg>`;
+}
+function brandChips(withAll = true){
+  const chip = b => `<button class="chip ${UI.brand === b.id ? 'on' : ''}" data-act="brand" data-id="${b.id}">${brandDot(b)}${esc(b.name)}</button>`;
+  return `<div class="chips" aria-label="Brand">${withAll ? `<button class="chip ${UI.brand === 'all' ? 'on' : ''}" data-act="brand" data-id="all">All brands</button>` : ''}
+    ${DB.factories.map(f => { const bs = brandsOf(f.id); return bs.length ? `<span class="grp" title="Brands supplied by the ${esc(f.name)} factory"><span>${esc(f.name)}</span>${bs.map(chip).join('')}</span>` : ''; }).join('')}
+    <button class="chip add" data-act="form" data-f="brand">+ Brand</button></div>`;
+}
+
+/* ============ views ============ */
+const ROUTES = {
+  home:['Overview','نظرة عامة'], sales:['Online sales','المبيعات أونلاين'],
+  'sales-brands':['Suppliers','البراندات'], 'sales-collections':['Collections','التحصيلات'],
+  'sales-invoices':['Invoices','الفواتير'], 'sales-statement':['Account statement','كشف حساب'],
+  production:['Production','الإنتاج'], marketing:['Marketing','التسويق'], safes:['Safes','الخزن'],
+};
+const SALES_SECTIONS = ['sales-brands','sales-collections','sales-invoices','sales-statement'];
+const SEC_ICON = {'sales-brands':'brands','sales-collections':'collections','sales-invoices':'invoices','sales-statement':'statement'};
+/* Navigation lives in page state: the artifact frame doesn't reliably deliver #hash changes. */
+let ROUTE = (() => { try { const r = location.hash.slice(1); return ROUTES[r] ? r : 'home'; } catch { return 'home'; } })();
+function route(){ return ROUTE; }
+function subnav(r){
+  return `<nav class="subnav" aria-label="Online sales sections"><a href="#sales" class="${r === 'sales' ? 'on' : ''}">Overview</a>${SALES_SECTIONS.map(k => `<a href="#${k}" class="${r === k ? 'on' : ''}">${ROUTES[k][0]}<span class="ar">${ROUTES[k][1]}</span></a>`).join('')}</nav>`;
+}
+
+/* ---- Online sales landing: four mini-dashboards ---- */
+function viewSales(){
+  const all = brandStats('all');
+  const per = DB.brands.map(b => ({b, s:brandStats(b.id)}));
+  const d14 = lastDays(14), d30 = lastDays(30);
+  const invP = DB.invoices.filter(inP), colMap = byDay(collections()), invMap = byDay(DB.invoices, () => 1);
+  const done = enteredToday().length;
+  const maxSold = Math.max(...per.map(p => p.s.sold), 1), maxDebt = Math.max(...DB.factories.map(f => factoryDebt(f.id)), 1);
+  return subnav('sales') + `
+  <div class="strip">
+    <div><div class="lbl">Sold <span class="ar">المبيعات</span></div><div class="big">${fmt(all.sold)}</div><div class="hint">${PERIOD_LABEL[UI.period]}</div></div>
+    <div><div class="lbl">Returned <span class="ar">المرتجعات</span></div><div class="big t-out">${fmt(all.returned)}</div><div class="hint">${pct(all.returned, all.sold)} of sold</div></div>
+    <div><div class="lbl">Shipping earned <span class="ar">الشحن</span></div><div class="big">${fmt(all.shipping)}</div><div class="hint">${PERIOD_LABEL[UI.period]}</div></div>
+    <div><div class="lbl">Collected <span class="ar">التحصيل</span></div><div class="big t-in">${fmt(all.collected)}</div><div class="hint">Into the main safe</div></div>
+    <div class="key"><div class="lbl">Owed to factories <span class="ar">الديون</span></div><div class="big t-out">${fmt(totalDebt())}</div><div class="hint">As of today</div></div>
+  </div>
+  <section class="tiles">
+    <a class="tile" href="#sales-brands">
+      <div class="tile-h"><span class="ico">${svgI('brands')}</span><div><h2>Suppliers</h2><span class="ar">البراندات · ستوك ومبيعات</span></div>
+        <span class="pill ${done === DB.brands.length ? 'p-in' : 'p-warn'}" style="margin-left:auto">Today ${done}/${DB.brands.length}</span></div>
+      <div><div class="big">${money(all.onHand)}</div><div class="muted" style="font-size:12.5px">Stock on hand across ${DB.brands.length} brands</div></div>
+      <div class="minirows">${per.map(p => `<div class="hbar"><span class="cellname">${brandDot(p.b)}${esc(p.b.name)}</span><span class="track"><span class="fill" style="width:${(p.s.sold/maxSold*100).toFixed(1)}%; background:${bColor(p.b)}"></span></span><span class="num">${fmtK(p.s.sold)}</span></div>`).join('')}</div>
+      <div class="tile-f"><span>Sold per brand · ${PERIOD_LABEL[UI.period].toLowerCase()}</span><b>Open →</b></div>
+    </a>
+    <a class="tile" href="#sales-collections">
+      <div class="tile-h"><span class="ico">${svgI('collections')}</span><div><h2>Collections</h2><span class="ar">التحصيلات</span></div></div>
+      <div><div class="big t-in">${money(all.collected)}</div><div class="muted" style="font-size:12.5px">Collected ${PERIOD_LABEL[UI.period].toLowerCase()} · ${pct(all.collected, all.net)} of net sales</div></div>
+      ${miniBars(d30.map(d => colMap.get(d) || 0), 'var(--in)')}
+      <div class="tile-f"><span>Daily collections, last 30 days · all go to the main safe</span><b>Open →</b></div>
+    </a>
+    <a class="tile" href="#sales-invoices">
+      <div class="tile-h"><span class="ico">${svgI('invoices')}</span><div><h2>Invoices</h2><span class="ar">الفواتير</span></div></div>
+      <div><div class="big">${fmt(invP.length)} <small>invoices</small></div><div class="muted" style="font-size:12.5px">EGP ${fmt(sum(invP))} logged ${PERIOD_LABEL[UI.period].toLowerCase()}</div></div>
+      ${miniBars(d14.map(d => invMap.get(d) || 0), 'var(--c1)')}
+      <div class="tile-f"><span>Invoices per day, last 14 days</span><b>Open →</b></div>
+    </a>
+    <a class="tile" href="#sales-statement">
+      <div class="tile-h"><span class="ico">${svgI('statement')}</span><div><h2>Account statement</h2><span class="ar">كشف حساب المصانع</span></div></div>
+      <div><div class="big t-out">${money(totalDebt())}</div><div class="muted" style="font-size:12.5px">Owed to ${DB.factories.length} factories as of today</div></div>
+      <div class="minirows">${DB.factories.map(f => { const d = factoryDebt(f.id); return `<div class="hbar"><span>${esc(f.name)}</span><span class="track"><span class="fill" style="width:${(Math.max(0,d)/maxDebt*100).toFixed(1)}%; background:var(--out)"></span></span><span class="num">${fmtK(d)}</span></div>`; }).join('')}</div>
+      <div class="tile-f"><span>Debt per factory</span><b>Open →</b></div>
+    </a>
+  </section>`;
+}
+
+/* ---- 1. Suppliers (brands) ---- */
+function viewBrands(){
+  const bid = UI.brand, b = brand(bid), s = brandStats(bid);
+  const d30 = lastDays(30), list = bid === 'all' ? DB.brands : [b];
+  const dd = DB.daily.filter(d => bid === 'all' || d.brandId === bid);
+  const series = key => list.map(x => { const m = byDay(dd.filter(d => d.brandId === x.id), d => d[key]); return {label:x.name, color:bColor(x), vals:d30.map(d => m.get(d) || 0)}; });
+  const sum30 = (m) => d30.map(d => m.get(d) || 0);
+  const f = x => bid === 'all' || x.brandId === bid;
+  const W = (n, title, ar, val, sub, sp, key) => `<div class="w${key ? ' key' : ''}"><div class="w-h"><span class="n">${n}</span>${title}<span class="ar">${ar}</span></div><div class="w-val">${val}</div><div class="w-sub">${sub}</div>${sp}</div>`;
+  const nDays = Math.max(1, new Set(dd.filter(inP).map(d => d.date)).size);
+
+  const today = DB.brands.filter(x => bid === 'all' || x.id === bid).map(x => {
+    const e = DB.daily.find(d => d.date === TODAY_S && d.brandId === x.id);
+    return `<div class="today-row"><span class="cellname" style="font-weight:600">${brandDot(x)}${esc(x.name)}</span>
+      ${e ? '<span class="pill p-in">Entered</span>' : '<span class="pill p-warn">Not entered</span>'}
+      <div class="vals"><span>Sold <b>${e ? fmt(e.sold) : '—'}</b></span><span>Returned <b>${e ? fmt(e.returned) : '—'}</b></span><span>Shipping <b>${e ? fmt(e.shipping) : '—'}</b></span></div></div>`; }).join('');
+
+  let lower;
+  if (bid === 'all'){
+    const rows = DB.brands.map(x => ({x, s:brandStats(x.id)}));
+    lower = `<div class="panel"><div class="panel-h"><h2>Brand comparison</h2><span class="ar">مقارنة البراندات</span><span class="sp muted" style="font-size:12px">${PERIOD_LABEL[UI.period]} · stock on hand as of today</span></div>
+      ${table([
+        {h:'Brand', f:r => `${brandName(r.x)}<span class="sub">${esc(factory(r.x.factoryId)?.name || '')} factory</span>`},
+        {h:'1 · Stock in', cls:'r', f:r => amt(r.s.stockIn)},
+        {h:'2 · Sold', cls:'r', f:r => amt(r.s.sold)},
+        {h:'3 · Collected', cls:'r', f:r => amt(r.s.collected, 't-in')},
+        {h:'4 · Flyers', cls:'r', f:r => amt(r.s.flyers)},
+        {h:'5 · Returned', cls:'r', f:r => `${amt(r.s.returned, 't-out')}<span class="sub">${pct(r.s.returned, r.s.sold)}</span>`},
+        {h:'6 · Shipping', cls:'r', f:r => amt(r.s.shipping)},
+        {h:'Stock on hand', cls:'r', f:r => `<b class="num">${fmt(r.s.onHand)}</b>`},
+        {h:'', cls:'r', f:r => `<button class="link" data-act="brand" data-id="${r.x.id}">Open →</button>`},
+      ], rows, '', `<tfoot><tr><td>All brands</td><td class="r num">${fmt(s.stockIn)}</td><td class="r num">${fmt(s.sold)}</td><td class="r num t-in">${fmt(s.collected)}</td><td class="r num">${fmt(s.flyers)}</td><td class="r num t-out">${fmt(s.returned)}</td><td class="r num">${fmt(s.shipping)}</td><td class="r num">${fmt(s.onHand)}</td><td></td></tr></tfoot>`)}</div>`;
+  } else {
+    // Daily report: every day in the period (newest first), with the stock balance after each day.
+    const start = UI.period === 'all' ? (DB.daily.filter(d => d.brandId === bid).map(d => d.date).sort()[0] || TODAY_S) : periodStart();
+    const dayList = []; for (let d = start; d <= TODAY_S; d = addDays(d, 1)) dayList.push(d);
+    const stockMap = byDay(DB.stock.filter(x => x.brandId === bid));
+    let hand = s.openHand; const rows = [];
+    for (const d of dayList){
+      const e = DB.daily.find(x => x.date === d && x.brandId === bid);
+      hand += (stockMap.get(d) || 0) - (e ? e.sold - e.returned : 0);
+      rows.push({d, e, rec:stockMap.get(d) || 0, hand, _cls: e ? '' : 'miss'});
+    }
+    rows.reverse();
+    lower = `<div class="panel"><div class="panel-h"><h2>${esc(b.name)} — daily report</h2><span class="ar">تقرير يومي</span><span class="sp muted" style="font-size:12px">Click a day to correct it</span></div>
+      ${table([
+        {h:'Day', f:r => `<span class="mono">${fmtDay(r.d)}</span>`},
+        {h:'Stock in', cls:'r', f:r => amt(r.rec)},
+        {h:'Sold', cls:'r', f:r => r.e ? amt(r.e.sold) : '<span class="pill p-warn">Not entered</span>'},
+        {h:'Returned', cls:'r', f:r => r.e ? `${amt(r.e.returned, 't-out')}<span class="sub">${pct(r.e.returned, r.e.sold)}</span>` : ''},
+        {h:'Shipping', cls:'r', f:r => r.e ? amt(r.e.shipping) : ''},
+        {h:'Net', cls:'r', f:r => r.e ? amt(r.e.sold - r.e.returned) : ''},
+        {h:'Stock after', cls:'r', f:r => `<span class="num">${fmt(r.hand)}</span>`},
+        {h:'', cls:'r', f:r => `<button class="link" data-act="sheet" data-d="${r.d}">${r.e ? 'Edit' : 'Enter'}</button>`},
+      ], rows)}</div>`;
+  }
+
+  return subnav('sales-brands') + `
+  <div class="toolbar">${brandChips()}
+    <div class="sp row-actions"><button class="btn sm" data-act="form" data-f="flyers">+ Flyers</button><button class="btn sm" data-act="form" data-f="stock">+ Stock received</button><button class="btn primary sm" data-act="sheet" data-d="${TODAY_S}">Enter today's numbers</button></div></div>
+  <section class="six">
+    ${W(1,'Stock received','الستوك', money(s.stockIn), `From the account statement · ${PERIOD_LABEL[UI.period].toLowerCase()}`, miniBars(sum30(byDay(DB.stock.filter(f))), 'var(--c1)'))}
+    ${W(2,'Sold','المبيعات', money(s.sold), `${fmt(s.sold/nDays)} per day · deducted from stock`, spark(sum30(byDay(dd, d => d.sold)), 'var(--accent)'), true)}
+    ${W(3,'Collections','التحصيل', money(s.collected), `${pct(s.collected, s.net)} of net sales`, spark(sum30(byDay(collections().filter(f))), 'var(--in)'))}
+    ${W(4,'Flyers','الفلايرز', money(s.flyers), `${DB.flyers.filter(x => f(x) && inP(x)).length} entries · ${pct(s.flyers, s.sold)} of sold`, miniBars(sum30(byDay(DB.flyers.filter(f))), 'var(--c4)'))}
+    ${W(5,'Returned','المرتجعات', money(s.returned), `${pct(s.returned, s.sold)} return rate · added back to stock`, spark(sum30(byDay(dd, d => d.returned)), 'var(--out)'))}
+    ${W(6,'Shipping','الشحن', money(s.shipping), `${fmt(s.shipping/nDays)} per day earned`, spark(sum30(byDay(dd, d => d.shipping)), 'var(--c5)'))}
+  </section>
+  <section class="grid g-2-1">
+    <div class="panel"><div class="panel-h"><h2>Stock flow</h2><span class="ar">حركة الستوك</span><span class="sp muted" style="font-size:12px">${PERIOD_LABEL[UI.period]}</span></div>
+      ${waterfall(s)}
+      <p class="panel-note">On hand = stock received from the factory − sold + returned.</p></div>
+    <div class="panel"><div class="panel-h"><h2>Today</h2><span class="ar">النهارده</span><button class="link sp" data-act="sheet" data-d="${TODAY_S}">Daily sheet →</button></div>
+      <div class="today">${today}</div></div>
+  </section>
+  <div class="panel"><div class="panel-h"><h2>Sold vs returned, last 30 days</h2><span class="ar">مبيعات ومرتجعات يومية</span>
+    <div class="legend sp">${list.map(x => `<span><i style="background:${bColor(x)}"></i>${esc(x.name)}</span>`).join('')}<span class="muted">Returns below the line</span></div></div>
+    ${dailyChart(d30, series('sold'), series('returned'))}</div>
+  ${lower}`;
+}
+
+/* ---- 2. Collections ---- */
+function viewCollections(){
+  const bid = UI.brand, f = x => bid === 'all' || x.brandId === bid;
+  const all = collections().filter(f), list = all.filter(inP).sort((a,b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const d30 = lastDays(30), tot = sum(list), today = sum(all.filter(t => t.date === TODAY_S));
+  const nDays = Math.max(1, new Set(list.map(t => t.date)).size);
+  const bs = bid === 'all' ? DB.brands : [brand(bid)];
+  const layers = bs.map(x => { const m = byDay(all.filter(t => t.brandId === x.id)); return {label:x.name, color:bColor(x), vals:d30.map(d => m.get(d) || 0)}; });
+  const vs = DB.brands.map(x => { const s = brandStats(x.id); return {x, net:s.net, col:s.collected}; });
+  const maxV = Math.max(...vs.map(v => Math.max(v.net, v.col)), 1);
+  return subnav('sales-collections') + `
+  <form class="quick" id="q-coll" novalidate>
+    <div class="qh"><b>Record a collection</b><span>Goes straight into the ${SAFE_NAMES.main[0].toLowerCase()} · الخزنة الرئيسية</span></div>
+    <div class="fld"><label for="qc-date">Day</label><input type="date" id="qc-date" value="${UI.qDate}" max="${TODAY_S}"></div>
+    <div class="fld"><label for="qc-brand">Brand</label><select id="qc-brand">${DB.brands.map(x => `<option value="${x.id}" ${(UI.qBrand || defBrand()) === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+    <div class="fld"><label for="qc-amount">Amount (EGP)</label><input type="number" id="qc-amount" min="0" step="any" inputmode="decimal" placeholder="0"></div>
+    <div class="fld"><label for="qc-note">Note</label><input id="qc-note" placeholder="e.g. Bosta settlement"></div>
+    <button class="btn primary" type="button" data-submit>Add to main safe</button>
+  </form>
+  <div class="toolbar">${brandChips()}</div>
+  <section class="six">
+    <div class="w key"><div class="w-h">Collected<span class="ar">${PERIOD_LABEL[UI.period]}</span></div><div class="w-val t-in">${money(tot)}</div><div class="w-sub">${list.length} collections</div>${spark(d30.map(d => sum(layers, l => l.vals[d30.indexOf(d)])), 'var(--in)')}</div>
+    <div class="w"><div class="w-h">Today<span class="ar">النهارده</span></div><div class="w-val">${money(today)}</div><div class="w-sub">${all.filter(t => t.date === TODAY_S).length} entries so far</div></div>
+    <div class="w"><div class="w-h">Main safe balance<span class="ar">الخزنة الرئيسية</span></div><div class="w-val">${money(safeBalance('main'))}</div><div class="w-sub"><a class="link" href="#safes" data-act="safe-link">Open the safe ledger →</a></div></div>
+  </section>
+  <section class="grid g-2-1">
+    <div class="panel"><div class="panel-h"><h2>Daily collections, last 30 days</h2><div class="legend sp">${bs.map(x => `<span><i style="background:${bColor(x)}"></i>${esc(x.name)}</span>`).join('')}</div></div>
+      ${dailyChart(d30, layers)}<p class="panel-note">Average ${fmt(tot/nDays)} per collection day in the selected period.</p></div>
+    <div class="panel"><div class="panel-h"><h2>Share by brand</h2><span class="ar">${PERIOD_LABEL[UI.period]}</span></div>
+      ${donut(DB.brands.map(x => ({label:x.name, color:bColor(x), v:sum(collections().filter(t => t.brandId === x.id && inP(t)))})), 'Collected', fmtK(sum(collections().filter(inP))))}</div>
+  </section>
+  <div class="panel"><div class="panel-h"><h2>Collected vs net sales</h2><span class="ar">المحصل مقابل صافي المبيعات</span>
+    <div class="legend sp"><span><i style="background:var(--line-2)"></i>Net sales (sold − returned)</span><span><i style="background:var(--in)"></i>Collected</span></div></div>
+    ${vs.map(v => `<div class="hbar"><span class="cellname">${brandDot(v.x)}${esc(v.x.name)}</span><span style="display:flex; flex-direction:column; gap:3px"><span class="track"><span class="fill" style="width:${(v.net/maxV*100).toFixed(1)}%; background:var(--line-2)"></span></span><span class="track"><span class="fill" style="width:${(v.col/maxV*100).toFixed(1)}%; background:var(--in)"></span></span></span><span class="num" style="text-align:right">${pct(v.col, v.net)}<span class="sub">${fmt(v.net - v.col)} pending</span></span></div>`).join('')}
+    <p class="panel-note">Pending is net sales not yet collected in this period, usually still with the shipping company.</p></div>
+  <div class="panel"><div class="panel-h"><h2>Collections log</h2><span class="ar">سجل التحصيلات</span></div>
+  ${table([
+    {h:'Day', f:t => `<span class="mono">${fmtDay(t.date)}</span>`},
+    {h:'Brand', f:t => brandName(brand(t.brandId))},
+    {h:'Note', f:t => esc(t.desc)},
+    {h:'Into', f:t => safeTag(t.safe)},
+    {h:'Amount', cls:'r', f:t => amt(t.amount, 't-in')},
+    {h:'', cls:'r', f:t => delBtn('txns', t.id)},
+  ], list, 'No collections in this period.', list.length ? `<tfoot><tr><td colspan="4">Total</td><td class="r num t-in">${fmt(tot)}</td><td></td></tr></tfoot>` : '')}</div>`;
+}
+
+/* ---- 3. Invoices ---- */
+function invoiceTable(){
+  const bid = UI.brand, q = (UI.invQ || '').toLowerCase();
+  const list = DB.invoices.filter(i => (bid === 'all' || i.brandId === bid) && inP(i) && (!q || `${i.no} ${i.note} ${brand(i.brandId)?.name}`.toLowerCase().includes(q)))
+    .sort((a,b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  return table([
+    {h:'Day', f:i => `<span class="mono">${fmtDay(i.date)}</span>`},
+    {h:'Invoice', f:i => `<span class="mono">${esc(i.no)}</span>`},
+    {h:'Brand', f:i => brandName(brand(i.brandId))},
+    {h:'Note', f:i => esc(i.note)},
+    {h:'Amount', cls:'r', f:i => amt(i.amount)},
+    {h:'', cls:'r', f:i => delBtn('invoices', i.id)},
+  ], list.slice(0, 300), q ? 'No invoices match your search.' : 'No invoices in this period.', list.length ? `<tfoot><tr><td colspan="4">${list.length} invoices${list.length > 300 ? ' (showing the latest 300)' : ''}</td><td class="r num">${fmt(sum(list))}</td><td></td></tr></tfoot>` : '');
+}
+function nextInvNo(bid){ const b = brand(bid); const nums = DB.invoices.filter(i => i.brandId === bid).map(i => +String(i.no).split('-').pop() || 0); return `${b.code}-${Math.max(1000, ...nums) + 1}`; }
+function viewInvoices(){
+  const bid = UI.brand, f = x => bid === 'all' || x.brandId === bid;
+  const all = DB.invoices.filter(f), list = all.filter(inP), d30 = lastDays(30);
+  const bs = bid === 'all' ? DB.brands : [brand(bid)];
+  const qb = UI.qBrand || defBrand();
+  return subnav('sales-invoices') + `
+  <form class="quick inv" id="q-inv" novalidate>
+    <div class="qh"><b>Log an invoice</b><span>Recorded as-is. No approval, no status.</span></div>
+    <div class="fld"><label for="qi-date">Day</label><input type="date" id="qi-date" value="${UI.qDate}" max="${TODAY_S}"></div>
+    <div class="fld"><label for="qi-brand">Brand</label><select id="qi-brand">${DB.brands.map(x => `<option value="${x.id}" ${qb === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+    <div class="fld"><label for="qi-no">Invoice no.</label><input id="qi-no" placeholder="${nextInvNo(qb)}"></div>
+    <div class="fld"><label for="qi-amount">Amount (EGP)</label><input type="number" id="qi-amount" min="0" step="any" inputmode="decimal" placeholder="0"></div>
+    <div class="fld"><label for="qi-note">Note</label><input id="qi-note" placeholder="What it was for"></div>
+    <button class="btn primary" type="button" data-submit>Add</button>
+  </form>
+  <div class="toolbar">${brandChips()}</div>
+  <section class="six">
+    <div class="w key"><div class="w-h">Invoices<span class="ar">${PERIOD_LABEL[UI.period]}</span></div><div class="w-val">${fmt(list.length)}</div><div class="w-sub">${all.filter(i => i.date === TODAY_S).length} logged today</div></div>
+    <div class="w"><div class="w-h">Total amount<span class="ar">الإجمالي</span></div><div class="w-val">${money(sum(list))}</div><div class="w-sub">${PERIOD_LABEL[UI.period]}</div></div>
+    <div class="w"><div class="w-h">Average invoice<span class="ar">المتوسط</span></div><div class="w-val">${money(list.length ? sum(list)/list.length : 0)}</div><div class="w-sub">Largest ${fmt(Math.max(0, ...list.map(i => i.amount)))}</div></div>
+  </section>
+  <section class="grid g-2-1">
+    <div class="panel"><div class="panel-h"><h2>Invoice amounts per day, last 30 days</h2><div class="legend sp">${bs.map(x => `<span><i style="background:${bColor(x)}"></i>${esc(x.name)}</span>`).join('')}</div></div>
+      ${dailyChart(d30, bs.map(x => { const m = byDay(all.filter(i => i.brandId === x.id)); return {label:x.name, color:bColor(x), vals:d30.map(d => m.get(d) || 0)}; }))}</div>
+    <div class="panel"><div class="panel-h"><h2>By brand</h2><span class="ar">${PERIOD_LABEL[UI.period]}</span></div>
+      ${donut(DB.brands.map(x => ({label:x.name, color:bColor(x), v:sum(DB.invoices.filter(i => i.brandId === x.id && inP(i)))})), 'Invoiced', fmtK(sum(DB.invoices.filter(inP))))}</div>
+  </section>
+  <div class="panel"><div class="panel-h"><h2>Invoice log</h2><span class="ar">سجل الفواتير</span><input class="search sp" id="inv-q" type="search" placeholder="Search number, note, brand" value="${esc(UI.invQ || '')}" aria-label="Search invoices"></div>
+    <div id="inv-tbl">${invoiceTable()}</div></div>`;
+}
+
+/* ---- 4. Account statement (per factory) ---- */
+function viewStatement(){
+  const fid = factory(UI.factory) ? UI.factory : DB.factories[0].id, fac = factory(fid), bs = brandsOf(fid);
+  const debt = factoryDebt(fid);
+  const recP = DB.stock.filter(s => s.factoryId === fid && inP(s)), payP = factoryPays().filter(t => t.factoryId === fid && inP(t));
+  const lastPay = factoryPays().filter(t => t.factoryId === fid && t.date <= TODAY_S).sort(byDate).pop();
+  const d90 = lastDays(90), debtLine = (() => {
+    const ev = byDay(DB.stock.filter(s => s.factoryId === fid)), pv = byDay(factoryPays().filter(t => t.factoryId === fid));
+    let run = factoryDebt(fid, addDays(d90[0], -1)); return d90.map(d => (run += (ev.get(d) || 0) - (pv.get(d) || 0)));
+  })();
+  const ev = [];
+  DB.stock.filter(s => s.factoryId === fid).forEach(s => ev.push({id:s.id, c:'stock', date:s.date, desc:'Stock received', b:brand(s.brandId), ref:s.ref, rec:s.amount, pay:0}));
+  factoryPays().filter(t => t.factoryId === fid).forEach(t => ev.push({id:t.id, c:'txns', date:t.date, desc:t.desc || 'Payment to factory', ref:`${t.method || ''} · ${SAFE_NAMES[t.safe]?.[0] || ''}`, rec:0, pay:t.amount}));
+  ev.sort((a,b) => a.date.localeCompare(b.date) || b.rec - a.rec);
+  const start = periodStart(); let run = 0, bf = 0; const rows = [];
+  for (const e of ev){ run += e.rec - e.pay; e.bal = run; if (e.date < start) bf = run; else if (e.date <= TODAY_S) rows.push(e); }
+  const shown = UI.period === 'all' ? rows : [{_cls:'bf', date:start, desc:'Balance brought forward', ref:'', rec:0, pay:0, bal:bf}, ...rows];
+  const maxD = Math.max(...DB.factories.map(f => factoryDebt(f.id)), 1);
+  return subnav('sales-statement') + `
+  <div class="toolbar"><div class="chips" aria-label="Factory">${DB.factories.map(f => `<button class="chip ${fid === f.id ? 'on' : ''}" data-act="factory" data-id="${f.id}">${esc(f.name)} factory<span style="opacity:.65; font-weight:400">· ${brandsOf(f.id).map(b => esc(b.name)).join(', ') || 'no brands'}</span></button>`).join('')}</div>
+    <div class="sp row-actions"><button class="btn sm" data-act="form" data-f="stock">+ Stock received</button><button class="btn primary sm" data-act="form" data-f="factory-pay">Pay the factory</button></div></div>
+  <section class="hero">
+    <div class="debt"><div class="lbl">I owe ${esc(fac.name)} factory <span class="ar" style="color:inherit">الديون اللي عليا للمصنع</span></div><div class="big">${money(debt)}</div><div class="hint">Stock received − payments, as of ${fmtDate(TODAY_S)}</div></div>
+    <div><div class="lbl">Stock received <span class="ar">ستوك</span></div><div class="big">${fmt(sum(recP))}</div><div class="hint">${recP.length} deliveries · ${PERIOD_LABEL[UI.period].toLowerCase()}</div></div>
+    <div><div class="lbl">Paid <span class="ar">مدفوع</span></div><div class="big t-in">${fmt(sum(payP))}</div><div class="hint">${payP.length} payments · ${PERIOD_LABEL[UI.period].toLowerCase()}</div></div>
+    <div><div class="lbl">Last payment</div><div class="big" style="font-size:18px">${lastPay ? fmtDate(lastPay.date) : '—'}</div><div class="hint">${lastPay ? 'EGP ' + fmt(lastPay.amount) : 'No payments yet'}</div></div>
+  </section>
+  <section class="grid g-2-1">
+    <div class="panel"><div class="panel-h"><h2>Debt to ${esc(fac.name)}, last 90 days</h2><span class="ar">تطور المديونية</span></div>${lineChart(d90, debtLine, 'var(--out)')}</div>
+    <div class="panel"><div class="panel-h"><h2>Stock received by brand</h2><span class="ar">${PERIOD_LABEL[UI.period]}</span></div>
+      ${bs.length ? hbars(bs.map(b => ({label:`${brandDot(b)}${esc(b.name)}`, color:bColor(b), v:sum(recP.filter(s => s.brandId === b.id))}))) : '<div class="empty">No brands linked to this factory.</div>'}
+      <p class="panel-note">Received stock is added to the brand's stock. Payments reduce this factory's debt only, never a brand.</p>
+      <div class="panel-h" style="margin:18px 0 8px"><h2>All factories</h2></div>
+      ${DB.factories.map(f => { const d = factoryDebt(f.id); return `<div class="hbar" style="cursor:pointer" data-act="factory" data-id="${f.id}"><span style="${f.id === fid ? 'font-weight:600' : ''}">${esc(f.name)}</span><span class="track"><span class="fill" style="width:${(Math.max(0,d)/maxD*100).toFixed(1)}%; background:var(--out); opacity:${f.id === fid ? 1 : .45}"></span></span><span class="num">${fmt(d)}</span></div>`; }).join('')}
+    </div>
+  </section>
+  <div class="panel"><div class="panel-h"><h2>${esc(fac.name)} factory — كشف حساب</h2><span class="sp muted" style="font-size:12px">Oldest first, like a printed statement</span></div>
+  ${table([
+    {h:'Date', f:r => `<span class="mono">${fmtDate(r.date)}</span>`},
+    {h:'Description', f:r => `${esc(r.desc)}${r.ref ? `<span class="sub">${esc(r.ref)}</span>` : ''}`},
+    {h:'Brand', f:r => r.b ? brandName(r.b) : ''},
+    {h:'Stock received · مدين', cls:'r', f:r => amt(r.rec)},
+    {h:'Paid · دائن', cls:'r', f:r => amt(r.pay, 't-in')},
+    {h:'Balance owed', cls:'r', f:r => `<span class="num">${fmt(r.bal)}</span>`},
+    {h:'', cls:'r', f:r => r.id ? delBtn(r.c, r.id) : ''},
+  ], shown, 'No movements yet.', `<tfoot><tr><td colspan="5">Closing balance owed as of ${fmtDate(TODAY_S)}</td><td class="r num t-out">${fmt(run)}</td><td></td></tr></tfoot>`)}</div>`;
+}
+
+/* ---- Overview ---- */
+function buildAlerts(){
+  const office = safeBalance('office'), a = [];
+  const pending = DB.brands.filter(b => !DB.daily.some(d => d.date === TODAY_S && d.brandId === b.id));
+  if (pending.length) a.push({sev:'var(--warn)', t:`Today's numbers missing for ${pending.length} brand${pending.length > 1 ? 's' : ''}`, s:pending.map(b => b.name).join(', '), go:'sales-brands', set:{brand:'all'}});
+  const hi = DB.brands.map(b => ({b, s:brandStats(b.id)})).filter(x => x.s.sold && x.s.rate > .1).sort((x,y) => y.s.rate - x.s.rate)[0];
+  if (hi) a.push({sev:'var(--out)', t:`${hi.b.name} returns at ${(hi.s.rate*100).toFixed(1)}%`, s:`EGP ${fmt(hi.s.returned)} returned ${PERIOD_LABEL[UI.period].toLowerCase()}`, go:'sales-brands', set:{brand:hi.b.id}});
+  if (office < DB.safes.office.low) a.push({sev:'var(--warn)', t:'Office safe is running low', s:`EGP ${fmt(office)} left, below the EGP ${fmt(DB.safes.office.low)} alert`, go:'safes', set:{safe:'office'}});
+  const missing = DB.txns.filter(t => t.safe === 'office' && t.dir === 'out' && t.receipt === false && inP(t));
+  if (missing.length) a.push({sev:'var(--warn)', t:`${missing.length} office expense${missing.length > 1 ? 's' : ''} without a receipt photo`, s:'Attach the receipt to close the petty-cash month', go:'safes', set:{safe:'office'}});
+  const top = DB.factories.map(f => ({f, d:factoryDebt(f.id)})).sort((x,y) => y.d - x.d)[0];
+  if (top && top.d > 0) a.push({sev:'var(--c1)', t:`Highest debt: ${top.f.name} factory`, s:`You owe EGP ${fmt(top.d)} on its account statement`, go:'sales-statement', set:{factory:top.f.id}});
+  return a;
+}
+let ALERTS = [];
+function viewHome(){
+  const tx = DB.txns.filter(inP), all = brandStats('all');
+  const prodOut = sum(tx.filter(t => t.module === 'production' && t.dir === 'out'));
+  const prodIn = sum(tx.filter(t => t.module === 'production' && t.dir === 'in'));
+  const unitsOut = sum(DB.moves.filter(inP).filter(m => m.dir === 'out'), m => m.qty);
+  const mkt = sum(tx.filter(t => t.module === 'marketing' && t.dir === 'out'));
+  const main = safeBalance('main'), office = safeBalance('office');
+  ALERTS = buildAlerts();
+  const recent = [...DB.txns].filter(t => t.date <= TODAY_S).sort((a,b) => b.date.localeCompare(a.date)).slice(0,7);
+  return `
+  <section class="kpis">
+    <a class="kpi" href="#sales"><div class="kpi-top"><span class="kpi-label">Online sales</span><span class="ar">المبيعات</span></div>
+      <div class="kpi-val">${money(all.sold)}</div><div class="kpi-sub">Returned ${pct(all.returned, all.sold)} · owed to factories EGP ${fmt(totalDebt())}</div>
+      ${spark(monthly(DB.daily.filter(d => d.date <= TODAY_S), d => d.sold), 'var(--c1)')}<span class="go">Open →</span></a>
+    <a class="kpi" href="#production"><div class="kpi-top"><span class="kpi-label">Production</span><span class="ar">الإنتاج</span></div>
+      <div class="kpi-val">${fmt(unitsOut)} <small>units out</small></div><div class="kpi-sub">Expenses EGP ${fmt(prodOut)} · collected EGP ${fmt(prodIn)}</div>
+      ${spark(monthly(DB.moves.filter(m => m.dir === 'out'), m => m.qty), 'var(--c3)')}<span class="go">Open →</span></a>
+    <a class="kpi" href="#marketing"><div class="kpi-top"><span class="kpi-label">Marketing spend</span><span class="ar">التسويق</span></div>
+      <div class="kpi-val">${money(mkt)}</div><div class="kpi-sub">${all.sold ? pct(mkt, all.sold) + ' of online sales' : 'No sales yet this period'}</div>
+      ${spark(monthly(DB.txns.filter(t => t.module === 'marketing' && t.dir === 'out')), 'var(--c4)')}<span class="go">Open →</span></a>
+    <a class="kpi" href="#safes"><div class="kpi-top"><span class="kpi-label">Cash in safes</span><span class="ar">الخزن</span></div>
+      <div class="kpi-val">${money(main + office)}</div><div class="kpi-sub">Main EGP ${fmt(main)} · Office <span class="${office < DB.safes.office.low ? 't-out' : ''}">EGP ${fmt(office)}</span></div>
+      ${spark(lastMonths().map(m => { const end = iso(new Date(m.getFullYear(), m.getMonth()+1, 0)); return DB.safes.main.opening + DB.safes.office.opening + sum(DB.txns.filter(t => (t.safe === 'main' || t.safe === 'office') && t.date <= end && t.date <= TODAY_S), t => t.dir === 'in' ? t.amount : -t.amount); }), 'var(--accent)')}<span class="go">Open →</span></a>
+  </section>
+  <section class="grid g-2-1">
+    <div class="panel">
+      <div class="panel-h"><h2>Money in vs out</h2><span class="ar">الوارد والمنصرف</span>
+        <div class="legend sp"><span><i style="background:var(--in)"></i>In</span><span><i style="background:var(--out)"></i>Out</span></div></div>
+      ${cashflowChart()}
+      <p class="panel-note">Last 6 months of cash, all modules. Transfers between your own safes are excluded.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>Needs attention</h2></div>
+      <div class="alerts">${ALERTS.length ? ALERTS.map((a,i) => `<button type="button" class="alert" style="--sev:${a.sev}" data-act="alert" data-i="${i}"><div><b>${esc(a.t)}</b><span>${esc(a.s)}</span></div></button>`).join('') : '<div class="empty">All clear.</div>'}</div>
+    </div>
+  </section>
+  <section class="grid g-2-1">
+    <div class="panel">
+      <div class="panel-h"><h2>Brands</h2><span class="ar">البراندات</span><span class="sp muted" style="font-size:12px">${PERIOD_LABEL[UI.period]} · stock as of today</span></div>
+      ${table([
+        {h:'Brand', f:r => brandName(r.b)},
+        {h:'Sold', cls:'r', f:r => amt(r.s.sold)},
+        {h:'Returned', cls:'r', f:r => amt(r.s.returned, 't-out')},
+        {h:'Collected', cls:'r', f:r => amt(r.s.collected, 't-in')},
+        {h:'Stock on hand', cls:'r', f:r => `<b class="num">${fmt(r.s.onHand)}</b>`},
+        {h:'', cls:'r', f:r => `<button class="link" data-act="open-brand" data-id="${r.b.id}">Open →</button>`},
+      ], DB.brands.map(b => ({b, s:brandStats(b.id)})))}
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>Latest cash activity</h2></div>
+      ${table([
+        {h:'Entry', f:t => `${esc(t.desc || t.category)}<span class="sub">${esc(whereOf(t))} · ${fmtDate(t.date)}</span>`},
+        {h:'', cls:'r', f:t => amt(t.amount, t.dir === 'in' ? 't-in' : 't-out')},
+      ], recent)}
+    </div>
+  </section>`;
+}
+function whereOf(t){
+  if (t.module === 'sales') return t.kind === 'collection' ? `Collection · ${brand(t.brandId)?.name || ''}` : `Factory payment · ${factory(t.factoryId)?.name || ''}`;
+  if (t.module === 'production') return `Production · ${section(t.sectionId)?.name || ''}`;
+  if (t.module === 'marketing') return `Marketing · ${t.channel}`;
+  return SAFE_NAMES[t.safe]?.[0] || 'Safe';
+}
+
+/* ---- Production, Marketing, Safes ---- */
+function viewProduction(){
+  const sid = UI.section;
+  const tx = DB.txns.filter(t => t.module === 'production' && (sid === 'all' || t.sectionId === sid) && inP(t));
+  const mv = DB.moves.filter(m => (sid === 'all' || m.sectionId === sid) && inP(m));
+  const exp = sum(tx.filter(t => t.dir === 'out')), col = sum(tx.filter(t => t.dir === 'in'));
+  const chips = `<div class="chips"><button class="chip ${sid === 'all' ? 'on' : ''}" data-act="sec" data-id="all">All sections</button>
+    ${DB.sections.map(s => `<button class="chip ${sid === s.id ? 'on' : ''}" data-act="sec" data-id="${s.id}">${esc(s.name)} <span style="opacity:.7">${esc(s.ar || '')}</span></button>`).join('')}
+    <button class="chip add" data-act="form" data-f="section">+ Add section</button></div>`;
+  const strip = `<div class="strip">
+    <div><div class="lbl">Expenses <span class="ar">المصروفات</span></div><div class="big t-out">${fmt(exp)}</div></div>
+    <div><div class="lbl">Collections <span class="ar">التحصيل</span></div><div class="big t-in">${fmt(col)}</div></div>
+    <div class="key"><div class="lbl">Net</div><div class="big ${col - exp >= 0 ? 't-in' : 't-out'}">${fmt(col - exp)}</div></div>
+    <div><div class="lbl">Units in <span class="ar">وارد</span></div><div class="big">${fmt(sum(mv.filter(m => m.dir === 'in'), m => m.qty))}</div></div>
+    <div><div class="lbl">Units out <span class="ar">صادر</span></div><div class="big">${fmt(sum(mv.filter(m => m.dir === 'out'), m => m.qty))}</div></div></div>`;
+  const secTot = DB.sections.map(s => { const t = DB.txns.filter(x => x.module === 'production' && x.sectionId === s.id && inP(x)); return {s, e:sum(t.filter(x => x.dir === 'out')), c:sum(t.filter(x => x.dir === 'in'))}; });
+  const m = Math.max(1, ...secTot.map(x => Math.max(x.e, x.c)));
+  const bySec = sid === 'all' ? `<div class="panel"><div class="panel-h"><h2>By section</h2><span class="legend sp"><span><i style="background:var(--out)"></i>Expenses</span><span><i style="background:var(--in)"></i>Collections</span></span></div>
+    ${secTot.map(({s,e,c}) => `<div class="hbar" style="cursor:pointer" data-act="sec" data-id="${s.id}"><span>${esc(s.name)}</span><span style="display:flex; flex-direction:column; gap:3px"><span class="track"><span class="fill" style="width:${e/m*100}%; background:var(--out)"></span></span><span class="track"><span class="fill" style="width:${c/m*100}%; background:var(--in)"></span></span></span><span class="num">${fmt(e)}<br><span class="t-in">${fmt(c)}</span></span></div>`).join('')}</div>` : '';
+  const tabs = [['expenses','Expenses','المصروفات'],['collections','Collections','التحصيل'],['moves','Stock in / out','وارد وصادر']];
+  const tabBar = `<div class="subnav">${tabs.map(([k,l,a]) => `<a href="#production" class="${UI.prodTab === k ? 'on' : ''}" data-act="ptab" data-k="${k}">${l}<span class="ar">${a}</span></a>`).join('')}</div>`;
+  const secCol = {h:'Section', f:x => esc(section(x.sectionId)?.name || '')};
+  let body;
+  if (UI.prodTab === 'moves'){
+    const list = [...mv].sort((a,b) => b.date.localeCompare(a.date));
+    body = `<div class="panel"><div class="panel-h"><h2>Stock movements</h2><button class="btn sm sp" data-act="form" data-f="move">+ Movement</button></div>
+      ${table([{h:'Date', f:m => `<span class="mono">${fmtDate(m.date)}</span>`}, secCol, {h:'Item', f:m => esc(m.item)}, {h:'Direction', f:m => `<span class="pill p-${m.dir}">${m.dir === 'in' ? 'In · وارد' : 'Out · صادر'}</span>`}, {h:'Qty', cls:'r', f:m => `<span class="num">${fmt(m.qty)}</span>`}], list)}</div>`;
+  } else {
+    const dir = UI.prodTab === 'expenses' ? 'out' : 'in';
+    const list = tx.filter(t => t.dir === dir).sort((a,b) => b.date.localeCompare(a.date));
+    body = `<div class="panel"><div class="panel-h"><h2>${dir === 'out' ? 'Expenses' : 'Collections'}</h2><button class="btn sm sp" data-act="form" data-f="${dir === 'out' ? 'prod-out' : 'prod-in'}">+ ${dir === 'out' ? 'Expense' : 'Collection'}</button></div>
+      ${table([{h:'Date', f:t => `<span class="mono">${fmtDate(t.date)}</span>`}, secCol, {h:'Category', f:t => esc(t.category)}, {h:'Paid from', f:t => safeTag(t.safe)}, {h:'Amount', cls:'r', f:t => amt(t.amount, dir === 'in' ? 't-in' : 't-out')}], list, 'Nothing recorded in this period.',
+      list.length ? `<tfoot><tr><td colspan="4">Total</td><td class="r num">${fmt(sum(list))}</td></tr></tfoot>` : '')}</div>`;
+  }
+  return chips + strip + bySec + tabBar + body;
+}
+function viewMarketing(){
+  const tx = DB.txns.filter(t => t.module === 'marketing' && inP(t));
+  const out = sum(tx.filter(t => t.dir === 'out')), inn = sum(tx.filter(t => t.dir === 'in'));
+  const sold = brandStats('all').sold;
+  const byCh = CHANNELS.map((ch,i) => ({label:esc(ch), v:sum(tx.filter(t => t.dir === 'out' && t.channel === ch)), color:`var(--c${i+1})`})).sort((a,b) => b.v - a.v);
+  const list = tx.filter(t => UI.mktFlow === 'all' || t.dir === UI.mktFlow).sort((a,b) => b.date.localeCompare(a.date));
+  return `<div class="strip">
+    <div><div class="lbl">Spent <span class="ar">منصرف</span></div><div class="big t-out">${fmt(out)}</div></div>
+    <div><div class="lbl">Money in <span class="ar">وارد</span></div><div class="big t-in">${fmt(inn)}</div><div class="hint">Refunds, credits</div></div>
+    <div class="key"><div class="lbl">Net spend</div><div class="big">${fmt(out - inn)}</div></div>
+    <div><div class="lbl">Share of online sales</div><div class="big">${pct(out - inn, sold)}</div><div class="hint">Net spend ÷ sold</div></div></div>
+  <section class="grid g-2-1">
+    <div class="panel"><div class="panel-h">
+      <div class="chips">${[['all','All'],['out','Money out'],['in','Money in']].map(([k,l]) => `<button class="chip ${UI.mktFlow === k ? 'on' : ''}" data-act="mflow" data-k="${k}">${l}</button>`).join('')}</div>
+      <div class="sp row-actions"><button class="btn sm" data-act="form" data-f="mkt-out">+ Spend</button><button class="btn sm" data-act="form" data-f="mkt-in">+ Money in</button></div></div>
+      ${table([{h:'Date', f:t => `<span class="mono">${fmtDate(t.date)}</span>`}, {h:'Channel', f:t => `${esc(t.channel)}<span class="sub">${esc(t.desc || '')}</span>`}, {h:'Paid from', f:t => safeTag(t.safe)},
+        {h:'In', cls:'r', f:t => t.dir === 'in' ? amt(t.amount, 't-in') : ''}, {h:'Out', cls:'r', f:t => t.dir === 'out' ? amt(t.amount, 't-out') : ''}], list)}</div>
+    <div class="panel"><div class="panel-h"><h2>Spend by channel</h2></div>${hbars(byCh)}</div>
+  </section>`;
+}
+function viewSafes(){
+  const s = UI.safe;
+  const card = k => {
+    const bal = safeBalance(k), cfg = DB.safes[k], t = DB.txns.filter(x => x.safe === k && inP(x));
+    const low = k === 'office' && bal < cfg.low;
+    return `<button class="safe ${s === k ? 'on' : ''}" data-act="safe" data-k="${k}" aria-pressed="${s === k}">
+      <div class="safe-h">${svgI('safes')}<div><h3 style="font-size:16px">${SAFE_NAMES[k][0]}</h3><span class="ar">${SAFE_NAMES[k][1]}</span></div>${low ? '<span class="pill p-out" style="margin-left:auto">Low</span>' : ''}</div>
+      <div class="big">${money(bal)}</div>
+      ${k === 'office' ? `<div class="meter ${low ? 'low' : ''}" title="Against an 8,000 monthly top-up"><i style="width:${Math.max(2, Math.min(100, bal/8000*100))}%"></i></div>` : ''}
+      <div class="io"><span>In <b class="num t-in">${fmt(sum(t.filter(x => x.dir === 'in')))}</b></span><span>Out <b class="num t-out">${fmt(sum(t.filter(x => x.dir === 'out')))}</b></span><span class="muted">${PERIOD_LABEL[UI.period]}</span></div>
+      <div class="rule"><span>${k === 'main' ? `Pays for <b>${cfg.allowedOut.length} approved categories only</b> · receives all sales collections` : 'Petty cash for daily receipts'}</span>
+        <div class="chips">${cfg.allowedOut.map(c => `<span class="tag">${esc(c)}</span>`).join('')}</div></div>
+    </button>`;
+  };
+  const ev = DB.txns.filter(t => t.safe === s).sort(byDate);
+  const start = periodStart(); let bal = DB.safes[s].opening, bf = bal; const rows = [];
+  for (const t of ev){ if (t.date > TODAY_S) continue; bal += t.dir === 'in' ? t.amount : -t.amount; if (t.date < start) bf = bal; else rows.push({...t, bal}); }
+  rows.reverse();
+  return `<section class="grid g-2">${card('main')}${card('office')}</section>
+    <div class="panel">
+      <div class="panel-h"><h2>${SAFE_NAMES[s][0]} ledger</h2><span class="ar">حركة ${SAFE_NAMES[s][1]}</span>
+        <div class="sp row-actions"><button class="btn sm" data-act="form" data-f="safe-out">− Withdraw</button><button class="btn sm" data-act="form" data-f="safe-in">+ Deposit</button><button class="btn sm primary" data-act="form" data-f="transfer">Main → Office transfer</button></div></div>
+      <p class="muted" style="margin:-4px 0 12px; font-size:12.5px">Every entry that names this safe lands here automatically: sales collections, factory payments, production, marketing and direct entries. Newest first.</p>
+      ${table([
+        {h:'Date', f:t => `<span class="mono">${fmtDate(t.date)}</span>`},
+        {h:'Entry', f:t => `${esc(t.desc || t.category)}<span class="sub">${esc(t.category)} · ${esc(whereOf(t))}</span>`},
+        ...(s === 'office' ? [{h:'Receipt', f:t => t.dir === 'out' ? (t.receipt === false ? '<span class="pill p-warn">Missing</span>' : '<span class="pill p-in">Attached</span>') : ''}] : []),
+        {h:'In', cls:'r', f:t => t.dir === 'in' ? amt(t.amount, 't-in') : ''},
+        {h:'Out', cls:'r', f:t => t.dir === 'out' ? amt(t.amount, 't-out') : ''},
+        {h:'Balance', cls:'r', f:t => `<span class="num">${fmt(t.bal)}</span>`},
+      ], rows.slice(0, 400), 'No movements in this period.', `<tfoot><tr><td colspan="${s === 'office' ? 5 : 4}">Opening for the period: ${fmt(bf)} · Closing</td><td class="r num">${fmt(bal)}</td></tr></tfoot>`)}
+    </div>`;
+}
+
+/* ============ forms ============ */
+const dlg = document.getElementById('dlg');
+function safeField(dir, category){
+  const opts = ['main','office','bank'].map(k => ({v:k, l:SAFE_NAMES[k][0], disabled: dir === 'out' && !allowedFrom(k, category)}));
+  const blocked = opts.filter(o => o.disabled).map(o => o.l);
+  return {k:'safe', label: dir === 'in' ? 'Goes into' : 'Paid from', type:'seg', options:opts, full:true,
+    warn: blocked.length ? `${blocked.join(' and ')} can't pay for “${category}”.` : ''};
+}
+const brandOpts = (fid) => (fid ? brandsOf(fid) : DB.brands).map(b => ({v:b.id, l:b.name}));
+const factoryOpts = () => DB.factories.map(f => ({v:f.id, l:`${f.name} factory`}));
+const sectionOpts = () => DB.sections.map(s => ({v:s.id, l:s.name}));
+const defBrand = () => UI.brand !== 'all' && brand(UI.brand) ? UI.brand : DB.brands[0]?.id;
+const defSection = () => UI.section !== 'all' ? UI.section : DB.sections[0]?.id;
+const base = () => ({date:TODAY_S, amount:'', note:''});
+
+const FORMS = {
+  'stock': () => ({title:'Stock received from a factory', ar:'استلام ستوك', init:{...base(), factoryId:UI.factory, brandId:''},
+    fields: v => { const bs = brandsOf(v.factoryId); if (!bs.some(b => b.id === v.brandId)) v.brandId = bs.find(b => b.id === UI.brand)?.id || bs[0]?.id || ''; return [
+      {k:'factoryId', label:'Factory', type:'select', options:factoryOpts(), rerender:true, hint:`Adds to what you owe this factory · now EGP ${fmt(factoryDebt(v.factoryId))}`},
+      {k:'brandId', label:'Brand it is for', type:'select', options:brandOpts(v.factoryId), hint:'Adds to this brand\'s stock'},
+      {k:'amount', label:'Value (EGP)', type:'number'}, {k:'date', label:'Date', type:'date'},
+      {k:'ref', label:'Delivery note no.', type:'text', ph:'e.g. DN-BL-140'}, {k:'note', label:'Note', type:'text'}]; },
+    validate: v => !v.brandId ? 'This factory has no brand yet. Add a brand for it first.' : '',
+    submit: v => { DB.stock.push({id:nid('s'), factoryId:v.factoryId, brandId:v.brandId, date:v.date, amount:+v.amount, ref:v.ref || '', note:v.note}); UI.factory = v.factoryId; return 'Stock added to the statement and the brand'; }}),
+  'factory-pay': () => ({title:'Pay a factory', ar:'سداد للمصنع', init:{...base(), factoryId:UI.factory, method:PAY_METHODS[0], safe:'main'},
+    fields: v => [
+      {k:'factoryId', label:'Factory', type:'select', options:factoryOpts(), rerender:true, hint:`You owe EGP ${fmt(factoryDebt(v.factoryId))}`},
+      {k:'method', label:'Paid via', type:'select', options:PAY_METHODS.map(x => ({v:x, l:x}))},
+      {k:'amount', label:'Amount (EGP)', type:'number', hint:'Reduces the factory debt only, not a brand'}, {k:'date', label:'Date', type:'date'},
+      safeField('out', 'Factory payments'), {k:'note', label:'Note', type:'text', full:true}],
+    validate: v => v.safe === 'main' && +v.amount > safeBalance('main') ? `The main safe only holds EGP ${fmt(safeBalance('main'))}.` : '',
+    submit: v => { DB.txns.push({id:nid('t'), module:'sales', kind:'factory-pay', dir:'out', factoryId:v.factoryId, date:v.date, amount:+v.amount, category:'Factory payments', safe:v.safe, method:v.method, desc:v.note || 'Payment to factory'}); UI.factory = v.factoryId; return 'Payment saved'; }}),
+  'collection': () => ({title:'Record a collection', ar:'تحصيل', init:{...base(), brandId:defBrand()},
+    fields: () => [
+      {k:'brandId', label:'Brand', type:'select', options:brandOpts()},
+      {k:'amount', label:'Amount (EGP)', type:'number'}, {k:'date', label:'Day', type:'date'},
+      {k:'note', label:'Note', type:'text', ph:'e.g. Bosta settlement'},
+      {type:'note', html:'Collections always go into the <b>main safe</b>.'}],
+    submit: v => { addCollection(v); return 'Collection added to the main safe'; }}),
+  'invoice': () => ({title:'Log an invoice', ar:'فاتورة', init:{...base(), brandId:defBrand(), no:''},
+    fields: v => [
+      {k:'brandId', label:'Brand', type:'select', options:brandOpts(), rerender:true},
+      {k:'no', label:'Invoice no.', type:'text', ph:nextInvNo(v.brandId)},
+      {k:'amount', label:'Amount (EGP)', type:'number'}, {k:'date', label:'Day', type:'date'},
+      {k:'note', label:'Note', type:'text', full:true}],
+    submit: v => { DB.invoices.push({id:nid('i'), date:v.date, brandId:v.brandId, no:v.no || nextInvNo(v.brandId), amount:+v.amount, note:v.note}); return 'Invoice logged'; }}),
+  'flyers': () => ({title:'Flyers', ar:'فلايرز', init:{...base(), brandId:defBrand(), qty:''},
+    fields: () => [
+      {k:'brandId', label:'Brand', type:'select', options:brandOpts()}, {k:'date', label:'Date', type:'date'},
+      {k:'amount', label:'Amount (EGP)', type:'number'}, {k:'qty', label:'Quantity (optional)', type:'number'},
+      {k:'note', label:'Note', type:'text', full:true}],
+    submit: v => { DB.flyers.push({id:nid('y'), date:v.date, brandId:v.brandId, amount:+v.amount, qty:+v.qty || 0, note:v.note}); return 'Flyers saved'; }}),
+  'prod-out': () => ({title:'Production expense', ar:'مصروف إنتاج', init:{...base(), sectionId:defSection(), category:'Raw materials', safe:'main'},
+    fields: v => [
+      {k:'sectionId', label:'Section', type:'select', options:sectionOpts()},
+      {k:'category', label:'Category', type:'select', options:PROD_EXP.map(x => ({v:x, l:x})), rerender:true},
+      {k:'amount', label:'Amount (EGP)', type:'number'}, {k:'date', label:'Date', type:'date'},
+      safeField('out', v.category), {k:'note', label:'Note', type:'text', full:true}],
+    submit: v => { DB.txns.push({id:nid('t'), module:'production', dir:'out', sectionId:v.sectionId, date:v.date, amount:+v.amount, category:v.category, safe:v.safe, desc:v.note || v.category, receipt: v.safe === 'office' ? false : undefined}); return 'Expense saved'; }}),
+  'prod-in': () => ({title:'Production collection', ar:'تحصيل إنتاج', init:{...base(), sectionId:defSection(), category:PROD_IN[0], safe:'main'},
+    fields: v => [
+      {k:'sectionId', label:'Section', type:'select', options:sectionOpts()},
+      {k:'category', label:'Type', type:'select', options:PROD_IN.map(x => ({v:x, l:x}))},
+      {k:'amount', label:'Amount (EGP)', type:'number'}, {k:'date', label:'Date', type:'date'},
+      safeField('in', v.category), {k:'note', label:'Note', type:'text', full:true}],
+    submit: v => { DB.txns.push({id:nid('t'), module:'production', dir:'in', sectionId:v.sectionId, date:v.date, amount:+v.amount, category:v.category, safe:v.safe, desc:v.note || v.category}); return 'Collection saved'; }}),
+  'move': () => ({title:'Production stock movement', ar:'حركة مخزن', init:{date:TODAY_S, sectionId:defSection(), dir:'in', item:'', qty:''},
+    fields: () => [
+      {k:'dir', label:'Direction', type:'seg', options:[{v:'in', l:'In · وارد'}, {v:'out', l:'Out · صادر'}], full:true},
+      {k:'sectionId', label:'Section', type:'select', options:sectionOpts()},
+      {k:'item', label:'Item', type:'text', ph:'e.g. Printed bags'},
+      {k:'qty', label:'Quantity', type:'number'}, {k:'date', label:'Date', type:'date'}],
+    validate: v => !v.item ? 'Name the item that moved.' : !(+v.qty > 0) ? 'Enter a quantity above zero.' : '',
+    submit: v => { DB.moves.push({id:nid('m'), sectionId:v.sectionId, dir:v.dir, date:v.date, item:v.item, qty:+v.qty}); return 'Movement saved'; }}),
+  'mkt-out': () => ({title:'Marketing spend', ar:'مصروف تسويق', init:{...base(), channel:CHANNELS[0], safe:'bank'},
+    fields: v => [
+      {k:'channel', label:'Channel', type:'select', options:CHANNELS.map(x => ({v:x, l:x})), rerender:true, full:true},
+      {k:'amount', label:'Amount (EGP)', type:'number'}, {k:'date', label:'Date', type:'date'},
+      safeField('out', mktCategory(v.channel)), {k:'note', label:'Note', type:'text', full:true}],
+    submit: v => { DB.txns.push({id:nid('t'), module:'marketing', dir:'out', channel:v.channel, date:v.date, amount:+v.amount, category:mktCategory(v.channel), safe:v.safe, desc:v.note || 'Ad spend'}); return 'Spend saved'; }}),
+  'mkt-in': () => ({title:'Marketing money in', ar:'وارد تسويق', init:{...base(), channel:CHANNELS[0], safe:'bank'},
+    fields: () => [
+      {k:'channel', label:'Channel', type:'select', options:CHANNELS.map(x => ({v:x, l:x})), full:true},
+      {k:'amount', label:'Amount (EGP)', type:'number'}, {k:'date', label:'Date', type:'date'},
+      safeField('in', 'Ad credit refund'), {k:'note', label:'Note', type:'text', full:true}],
+    submit: v => { DB.txns.push({id:nid('t'), module:'marketing', dir:'in', channel:v.channel, date:v.date, amount:+v.amount, category:'Ad credit refund', safe:v.safe, desc:v.note || 'Refund / credit'}); return 'Saved'; }}),
+  'safe-out': () => ({title:'Withdraw from a safe', ar:'صرف من الخزنة', init:{...base(), safe:UI.safe, category:''},
+    fields: v => { const list = DB.safes[v.safe].allowedOut.filter(c => c !== 'Transfer to office safe' && c !== 'Factory payments'); if (!list.includes(v.category)) v.category = list[0]; return [
+      {k:'safe', label:'Safe', type:'seg', options:[{v:'main', l:'Main safe'}, {v:'office', l:'Office safe'}], full:true, rerender:true},
+      {k:'category', label:'What for', type:'select', options:list.map(x => ({v:x, l:x})), full:true,
+        hint: v.safe === 'main' ? `The main safe only pays its ${DB.safes.main.allowedOut.length} approved categories. Factory payments are recorded from the account statement.` : 'Petty cash: keep the receipt photo with every entry.'},
+      {k:'amount', label:'Amount (EGP)', type:'number', hint:`Balance: EGP ${fmt(safeBalance(v.safe))}`}, {k:'date', label:'Date', type:'date'},
+      ...(v.safe === 'office' ? [{k:'receipt', label:'Receipt photo', type:'file', full:true}] : []),
+      {k:'note', label:'Description', type:'text', full:true, ph: v.safe === 'office' ? 'e.g. Supermarket — tea, sugar, water' : 'e.g. October payroll'}]; },
+    validate: v => +v.amount > safeBalance(v.safe) ? `The ${SAFE_NAMES[v.safe][0].toLowerCase()} only holds EGP ${fmt(safeBalance(v.safe))}.` : '',
+    submit: v => { DB.txns.push({id:nid('t'), module:'safe', dir:'out', safe:v.safe, date:v.date, amount:+v.amount, category:v.category, desc:v.note || v.category, receipt: v.safe === 'office' ? !!v.receipt : undefined}); return 'Withdrawal saved'; }}),
+  'safe-in': () => ({title:'Deposit into a safe', ar:'إيداع في الخزنة', init:{...base(), safe:UI.safe, category:SAFE_IN[0]},
+    fields: () => [
+      {k:'safe', label:'Safe', type:'seg', options:[{v:'main', l:'Main safe'}, {v:'office', l:'Office safe'}], full:true},
+      {k:'category', label:'Source', type:'select', options:SAFE_IN.map(x => ({v:x, l:x})), full:true, hint:'Sales collections are recorded under Online sales → Collections. Use a transfer to move money from main to office.'},
+      {k:'amount', label:'Amount (EGP)', type:'number'}, {k:'date', label:'Date', type:'date'},
+      {k:'note', label:'Description', type:'text', full:true}],
+    submit: v => { DB.txns.push({id:nid('t'), module:'safe', dir:'in', safe:v.safe, date:v.date, amount:+v.amount, category:v.category, desc:v.note || v.category}); return 'Deposit saved'; }}),
+  'transfer': () => ({title:'Transfer main → office', ar:'تحويل للخزنة الفرعية', init:{...base(), amount:8000},
+    fields: () => [
+      {k:'amount', label:'Amount (EGP)', type:'number', hint:`Main safe holds EGP ${fmt(safeBalance('main'))}`}, {k:'date', label:'Date', type:'date'},
+      {k:'note', label:'Note', type:'text', full:true}],
+    validate: v => +v.amount > safeBalance('main') ? 'The main safe does not hold that much.' : '',
+    submit: v => { const link = nid('x');
+      DB.txns.push({id:nid('t'), link, module:'safe', dir:'out', safe:'main', date:v.date, amount:+v.amount, category:'Transfer to office safe', desc:v.note || 'Top-up office safe'});
+      DB.txns.push({id:nid('t'), link, module:'safe', dir:'in', safe:'office', date:v.date, amount:+v.amount, category:'Transfer from main safe', desc:v.note || 'Top-up from main safe'});
+      return 'Transfer saved in both safes'; }}),
+  'brand': () => ({title:'Add a brand', ar:'إضافة براند', init:{name:'', factoryId:DB.factories[0].id, newFactory:''},
+    fields: v => [
+      {k:'name', label:'Brand name', type:'text', full:true},
+      {k:'factoryId', label:'Supplied by', type:'select', options:[...factoryOpts(), {v:'new', l:'A new factory…'}], rerender:true, full:true,
+        hint:'Brands from the same factory share one account statement, like Blanc and Lady Blanc.'},
+      ...(v.factoryId === 'new' ? [{k:'newFactory', label:'New factory name', type:'text', full:true}] : [])],
+    validate: v => !v.name.trim() ? 'Give the brand a name.' : DB.brands.some(b => b.name.toLowerCase() === v.name.trim().toLowerCase()) ? 'A brand with that name already exists.' : v.factoryId === 'new' && !v.newFactory.trim() ? 'Name the new factory.' : '',
+    submit: v => { let fid = v.factoryId;
+      if (fid === 'new'){ const f = {id:nid('f'), name:v.newFactory.trim(), ar:''}; DB.factories.push(f); fid = f.id; }
+      const name = v.name.trim(); const b = {id:nid('b'), name, code:name.replace(/[^A-Za-z ]/g,'').split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0,3).toUpperCase() || 'BR', factoryId:fid, color:DB.brands.length};
+      DB.brands.push(b); UI.brand = b.id; return `${name} added`; }}),
+  'section': () => ({title:'Add a production section', ar:'قسم جديد', init:{name:'', ar:''},
+    fields: () => [{k:'name', label:'Section name', type:'text'}, {k:'ar', label:'Arabic name', type:'text'}],
+    validate: v => !v.name.trim() ? 'Give the section a name.' : '',
+    submit: v => { const s = {id:nid('s'), name:v.name.trim(), ar:v.ar.trim()}; DB.sections.push(s); UI.section = s.id; return `${s.name} added`; }}),
+};
+const NEEDS_AMOUNT = k => !['move','brand','section'].includes(k);
+function addCollection(v){ DB.txns.push({id:nid('t'), module:'sales', kind:'collection', dir:'in', brandId:v.brandId, date:v.date, amount:+v.amount, category:'Sales collection', safe:'main', desc:v.note || 'Collected from shipping co.'}); }
+
+function openForm(key){
+  const def = FORMS[key](); const v = {...def.init}; let err = '';
+  const draw = () => {
+    const fields = def.fields(v);
+    for (const f of fields) if (f.type === 'seg' && f.options.find(o => o.v === v[f.k])?.disabled) v[f.k] = f.options.find(o => !o.disabled)?.v;
+    dlg.innerHTML = `<div class="dlg-h"><h2>${def.title}</h2><span class="ar">${def.ar || ''}</span></div>
+    <form class="f" id="frm" novalidate>${err ? `<div class="f-err" role="alert">${esc(err)}</div>` : ''}${fields.map(f => fieldHTML(f, v)).join('')}
+      <div class="f-actions"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary" type="button" data-submit>Save</button></div></form>`;
+    const frm = dlg.querySelector('#frm');
+    frm.addEventListener('change', e => {
+      const f = fields.find(x => x.k === e.target.name); if (!f) return;
+      v[f.k] = f.type === 'file' ? (e.target.files[0]?.name || '') : e.target.value;
+      if (f.rerender){ err = ''; draw(); }
+    });
+    frm.addEventListener('input', e => { const f = fields.find(x => x.k === e.target.name); if (f && f.type !== 'file' && f.type !== 'seg') v[f.k] = e.target.value; });
+    frm.addEventListener('submit', e => {
+      e.preventDefault();
+      err = (NEEDS_AMOUNT(key) && !(+v.amount > 0)) ? 'Enter an amount above zero.' : ('date' in v && !v.date) ? 'Pick a date.' : (def.validate?.(v) || '');
+      const sf = fields.find(f => f.k === 'safe' && f.type === 'seg');
+      if (!err && sf && sf.options.find(o => o.v === v.safe)?.disabled) err = 'That safe cannot pay for this category.';
+      if (err) return draw();
+      const msg = def.submit(v);
+      if (v.brandId && UI.brand !== 'all' && UI.brand !== v.brandId) UI.brand = v.brandId; // keep the new entry visible
+      save(); saveUI(); dlg.close(); toast(msg); render();
+    });
+    dlg.querySelector('[data-close]').onclick = () => dlg.close();
+    frm.querySelector('input:not([type=radio]):not([type=file]), select')?.focus();
+  };
+  draw(); if (!dlg.open) dlg.showModal();
+}
+function fieldHTML(f, v){
+  const id = `f-${f.k}`, full = f.full ? ' full' : '';
+  const hint = (f.hint ? `<span class="hint">${esc(f.hint)}</span>` : '') + (f.warn ? `<span class="warnhint">${esc(f.warn)}</span>` : '');
+  if (f.type === 'note') return `<p class="fld full hint muted" style="margin:0; font-size:12.5px">${f.html}</p>`;
+  if (f.type === 'seg') return `<div class="fld${full}"><span class="lab" id="${id}-l">${f.label}</span><div class="seg" role="radiogroup" aria-labelledby="${id}-l">${f.options.map(o => `<label><input type="radio" id="${id}-${o.v}" name="${f.k}" value="${o.v}" ${v[f.k] === o.v ? 'checked' : ''} ${o.disabled ? 'disabled' : ''}>${esc(o.l)}</label>`).join('')}</div>${hint}</div>`;
+  if (f.type === 'select') return `<div class="fld${full}"><label for="${id}">${f.label}</label><select id="${id}" name="${f.k}">${f.options.map(o => `<option value="${esc(o.v)}" ${String(v[f.k]) === String(o.v) ? 'selected' : ''}>${esc(o.l)}</option>`).join('')}</select>${hint}</div>`;
+  if (f.type === 'file') return `<div class="fld${full}"><label for="${id}">${f.label}</label><input id="${id}" name="${f.k}" type="file" accept="image/*">${hint || '<span class="hint">Optional in this demo. In the MVP the photo is stored with the entry.</span>'}</div>`;
+  const type = f.type === 'number' ? 'number" inputmode="decimal" min="0" step="any' : f.type;
+  return `<div class="fld${full}"><label for="${id}">${f.label}</label><input id="${id}" name="${f.k}" type="${type}" value="${esc(v[f.k] ?? '')}" ${f.ph ? `placeholder="${esc(f.ph)}"` : ''}>${hint}</div>`;
+}
+/* Daily sheet: one row per brand — sold, returned, shipping. Re-opening a day edits it. */
+function openSheet(date = TODAY_S){
+  let d = date, err = '';
+  const draw = () => {
+    dlg.innerHTML = `<div class="dlg-h"><h2>Daily sheet</h2><span class="ar">يومية البراندات</span></div>
+    <form class="f" id="frm" novalidate>${err ? `<div class="f-err" role="alert">${esc(err)}</div>` : ''}
+      <div class="fld full"><label for="s-date">Day</label><input type="date" id="s-date" value="${d}" max="${TODAY_S}">
+        <span class="hint">Sold is deducted from the brand's stock; returns go back into it. Leave a row empty to skip that brand.</span></div>
+      <div class="full tbl-wrap"><table class="sheet"><thead><tr><th>Brand</th><th class="r">Sold</th><th class="r">Returned</th><th class="r">Shipping</th></tr></thead><tbody>
+      ${DB.brands.map(b => { const e = DB.daily.find(x => x.date === d && x.brandId === b.id); return `<tr><td>${brandName(b)}</td>${['sold','returned','shipping'].map(k => `<td><input type="number" min="0" step="any" inputmode="decimal" id="s-${b.id}-${k}" aria-label="${esc(b.name)} ${k}" value="${e ? e[k] : ''}" placeholder="0"></td>`).join('')}</tr>`; }).join('')}
+      </tbody></table></div>
+      <div class="f-actions"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary" type="button" data-submit>Save day</button></div></form>`;
+    dlg.querySelector('#s-date').onchange = e => { d = e.target.value || TODAY_S; err = ''; draw(); };
+    dlg.querySelector('[data-close]').onclick = () => dlg.close();
+    dlg.querySelector('#frm').onsubmit = e => {
+      e.preventDefault();
+      const rows = DB.brands.map(b => { const g = k => dlg.querySelector(`#s-${b.id}-${k}`).value; return {b, sold:g('sold'), returned:g('returned'), shipping:g('shipping')}; });
+      if (rows.some(r => [r.sold, r.returned, r.shipping].some(x => x !== '' && +x < 0))) { err = 'Numbers can\'t be negative.'; return draw(); }
+      let n = 0;
+      for (const r of rows){
+        const i = DB.daily.findIndex(x => x.date === d && x.brandId === r.b.id);
+        if (r.sold === '' && r.returned === '' && r.shipping === ''){ if (i >= 0) DB.daily.splice(i, 1); continue; }
+        const rec = {id: i >= 0 ? DB.daily[i].id : nid('d'), date:d, brandId:r.b.id, sold:+r.sold || 0, returned:+r.returned || 0, shipping:+r.shipping || 0};
+        if (i >= 0) DB.daily[i] = rec; else DB.daily.push(rec); n++;
+      }
+      save(); dlg.close(); toast(`${fmtDay(d)} saved for ${n} brand${n === 1 ? '' : 's'}`); render();
+    };
+    dlg.querySelector(`#s-${DB.brands[0]?.id}-sold`)?.focus();
+  };
+  draw(); if (!dlg.open) dlg.showModal();
+}
+function openChooser(){
+  const groups = [
+    ['Online sales', [['sheet','Daily sheet','مبيعات · مرتجعات · شحن'], ['collection','Collection','تحصيل → الخزنة الرئيسية'], ['invoice','Invoice','فاتورة'], ['stock','Stock received','استلام ستوك من المصنع'], ['factory-pay','Pay a factory','سداد للمصنع'], ['flyers','Flyers','فلايرز']]],
+    ['Production & marketing', [['prod-out','Production expense','مصروف إنتاج'], ['move','Production stock in / out','وارد وصادر'], ['mkt-out','Marketing spend','مصروف تسويق'], ['prod-in','Production collection','تحصيل إنتاج']]],
+    ['Safes', [['safe-out','Withdraw from safe','صرف من الخزنة'], ['transfer','Main → office transfer','تحويل بين الخزن']]],
+  ];
+  dlg.innerHTML = `<div class="dlg-h"><h2>New entry</h2><span class="ar">قيد جديد</span></div>
+    <div class="choose">${groups.map(([g, items]) => `<h3>${g}</h3>${items.map(([k,l,a]) => `<button type="button" data-pick="${k}"><b>${l}</b><span>${a}</span></button>`).join('')}`).join('')}</div>`;
+  dlg.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => b.dataset.pick === 'sheet' ? openSheet() : openForm(b.dataset.pick));
+  if (!dlg.open) dlg.showModal();
+}
+function confirmReset(){
+  dlg.innerHTML = `<div class="dlg-h"><h2>Reset sample data?</h2></div>
+    <form class="f" id="frm"><p class="fld full" style="margin:0">Everything you added in this browser is replaced with the original example figures.</p>
+    <div class="f-actions"><button type="button" class="btn ghost" data-close>Keep my entries</button><button class="btn primary" type="button" data-submit>Reset</button></div></form>`;
+  dlg.querySelector('[data-close]').onclick = () => dlg.close();
+  dlg.querySelector('#frm').onsubmit = e => { e.preventDefault(); DB = seed(); save(); dlg.close(); toast('Sample data restored'); render(); };
+  dlg.showModal();
+}
+dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+
+let toastT;
+function toast(msg, undo){
+  document.querySelector('.toast')?.remove();
+  const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role','status');
+  const s = document.createElement('span'); s.textContent = msg; t.append(s);
+  if (undo){ const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Undo'; b.onclick = () => { undo(); save(); t.remove(); render(); }; t.append(b); }
+  document.body.appendChild(t); clearTimeout(toastT); toastT = setTimeout(() => t.remove(), undo ? 6000 : 2400);
+}
+
+/* ============ render & events ============ */
+function render(){
+  // Drop selections that point at records which no longer exist (e.g. after a reset).
+  if (UI.brand !== 'all' && !brand(UI.brand)) UI.brand = 'all';
+  if (UI.qBrand && !brand(UI.qBrand)) UI.qBrand = '';
+  if (!factory(UI.factory)) UI.factory = DB.factories[0]?.id;
+  if (UI.section !== 'all' && !section(UI.section)) UI.section = 'all';
+  const r = route();
+  const pending = DB.brands.length - enteredToday().length;
+  const officeLow = safeBalance('office') < DB.safes.office.low;
+  const isSales = r.startsWith('sales');
+  document.getElementById('nav').innerHTML = `<div class="nav-h">Modules</div>` + ['home','sales','production','marketing','safes'].map(k => {
+    const on = k === 'sales' ? isSales : r === k;
+    let h = `<a href="#${k}" class="${on ? 'on' : ''}" ${r === k ? 'aria-current="page"' : ''}>${svgI(k)}<span class="lbl">${ROUTES[k][0]}</span>${k === 'sales' && pending ? `<span class="badge w" title="Brands without today's numbers">${pending}</span>` : ''}${k === 'safes' && officeLow ? '<span class="badge">low</span>' : ''}</a>`;
+    if (k === 'sales') h += SALES_SECTIONS.map(s => `<a href="#${s}" class="sub ${r === s ? 'on' : ''}" ${r === s ? 'aria-current="page"' : ''}>${ROUTES[s][0]}</a>`).join('');
+    return h;
+  }).join('');
+  const [title, ar] = ROUTES[r];
+  document.getElementById('crumb-title').innerHTML = `${title} <span class="ar" style="font-size:14px">${ar}</span>`;
+  document.getElementById('crumb-sub').innerHTML = r === 'home' ? `${PERIOD_LABEL[UI.period]} · ${fmtDate(TODAY_S)}`
+    : `<a href="#home">Overview</a> / ${isSales && r !== 'sales' ? '<a href="#sales">Online sales</a> / ' : ''}${title}`;
+  document.getElementById('period').value = UI.period;
+  const views = {home:viewHome, sales:viewSales, 'sales-brands':viewBrands, 'sales-collections':viewCollections, 'sales-invoices':viewInvoices, 'sales-statement':viewStatement, production:viewProduction, marketing:viewMarketing, safes:viewSafes};
+  document.getElementById('view').innerHTML = views[r]();
+}
+function go(r, set){ Object.assign(UI, set || {}); saveUI(); ROUTE = ROUTES[r] ? r : 'home'; render(); window.scrollTo(0,0); }
+
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[href^="#"]');
+  const el = e.target.closest('[data-act]');
+  if (a) e.preventDefault();
+  if (a && (!el || el.dataset.act === 'safe-link')){ if (el) { UI.safe = 'main'; } go(a.getAttribute('href').slice(1)); return; }
+  if (!el) return;
+  const {act, id, k, f, i, c, d} = el.dataset;
+  const set = (o) => { Object.assign(UI, o); saveUI(); render(); };
+  switch (act){
+    case 'new': openChooser(); break;
+    case 'form': openForm(f); break;
+    case 'sheet': openSheet(d); break;
+    case 'theme': { const root = document.documentElement; const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; root.dataset.theme = dark ? 'light' : 'dark'; try { localStorage.setItem('finance-hub-theme', root.dataset.theme); } catch {} break; }
+    case 'reset': confirmReset(); break;
+    case 'brand': set({brand:id}); break;
+    case 'factory': set({factory:id}); break;
+    case 'open-brand': go('sales-brands', {brand:id}); break;
+    case 'sec': set({section:id}); break;
+    case 'ptab': e.preventDefault(); set({prodTab:k}); break;
+    case 'mflow': set({mktFlow:k}); break;
+    case 'safe': set({safe:k}); break;
+    case 'safe-link': UI.safe = 'main'; saveUI(); break;
+    case 'alert': { const a = ALERTS[+i]; if (a) go(a.go, a.set); break; }
+    case 'del': {
+      const coll = DB[c], idx = coll.findIndex(x => x.id === id); if (idx < 0) break;
+      const [gone] = coll.splice(idx, 1); save(); render();
+      toast('Entry deleted', () => coll.splice(Math.min(idx, coll.length), 0, gone));
+      break;
+    }
+  }
+});
+document.addEventListener('submit', e => {
+  const fm = e.target;
+  if (fm.id === 'q-coll'){
+    e.preventDefault();
+    const v = {date:fm.querySelector('#qc-date').value, brandId:fm.querySelector('#qc-brand').value, amount:fm.querySelector('#qc-amount').value, note:fm.querySelector('#qc-note').value};
+    if (!(+v.amount > 0)){ toast('Enter an amount above zero.'); fm.querySelector('#qc-amount').focus(); return; }
+    if (!v.date){ toast('Pick a day.'); return; }
+    addCollection(v); UI.qDate = v.date; UI.qBrand = v.brandId;
+    if (UI.brand !== 'all' && UI.brand !== v.brandId) UI.brand = v.brandId; // keep the new entry visible in the log
+    save(); saveUI(); render();
+    toast(`EGP ${fmt(+v.amount)} from ${brand(v.brandId).name} added to the main safe`);
+    document.getElementById('qc-amount')?.focus();
+  }
+  if (fm.id === 'q-inv'){
+    e.preventDefault();
+    const v = {date:fm.querySelector('#qi-date').value, brandId:fm.querySelector('#qi-brand').value, no:fm.querySelector('#qi-no').value.trim(), amount:fm.querySelector('#qi-amount').value, note:fm.querySelector('#qi-note').value};
+    if (!(+v.amount > 0)){ toast('Enter an amount above zero.'); fm.querySelector('#qi-amount').focus(); return; }
+    if (!v.date){ toast('Pick a day.'); return; }
+    const no = v.no || nextInvNo(v.brandId);
+    DB.invoices.push({id:nid('i'), date:v.date, brandId:v.brandId, no, amount:+v.amount, note:v.note});
+    UI.qDate = v.date; UI.qBrand = v.brandId;
+    if (UI.brand !== 'all' && UI.brand !== v.brandId) UI.brand = v.brandId; // keep the new entry visible in the log
+    save(); saveUI(); render();
+    toast(`Invoice ${no} logged`);
+    document.getElementById('qi-amount')?.focus();
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'qi-brand'){ UI.qBrand = e.target.value; const no = document.getElementById('qi-no'); if (no) no.placeholder = nextInvNo(e.target.value); }
+  if (e.target.id === 'qc-brand') UI.qBrand = e.target.value;
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'inv-q'){ UI.invQ = e.target.value; document.getElementById('inv-tbl').innerHTML = invoiceTable(); }
+});
+/* The artifact frame can block real form submission, so Save buttons and the Enter key
+   run each form's submit handler directly instead of submitting the form. */
+const runSubmit = form => form && form.dispatchEvent(new Event('submit', {bubbles:true, cancelable:true}));
+document.addEventListener('click', e => { const b = e.target.closest('[data-submit]'); if (b){ e.preventDefault(); runSubmit(b.closest('form')); } });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  const t = e.target; if (!t.closest || !t.closest('form') || !t.matches('input:not([type=file]):not([type=radio]):not([type=search]), select')) return;
+  e.preventDefault(); runSubmit(t.closest('form'));
+});
+document.getElementById('period').addEventListener('change', e => { UI.period = e.target.value; saveUI(); render(); });
+try { const th = localStorage.getItem('finance-hub-theme'); if (th) document.documentElement.dataset.theme = th; } catch {}
+render();
+</script>
+</body>
+</html>
